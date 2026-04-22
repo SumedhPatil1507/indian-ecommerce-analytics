@@ -4,9 +4,15 @@ dashboard/app.py
 Streamlit Interactive Dashboard
 All charts are Plotly (fully interactive).
 
-Run:
+Run locally:
     streamlit run dashboard/app.py
+
+Deploy on Streamlit Cloud:
+    - Push repo to GitHub
+    - Connect at share.streamlit.io
+    - Upload the CSV via the sidebar file uploader (no Kaggle path needed)
 """
+import io
 import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -17,10 +23,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
-from data.loader import (
-    load, fetch_worldbank, fetch_usd_inr,
-    fetch_google_trends, _WB_GDP, _WB_CPI,
-)
+from data.loader import load, _clean, _engineer
 
 # ── page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -32,27 +35,77 @@ st.set_page_config(
 
 # ── sidebar ───────────────────────────────────────────────────────────────────
 st.sidebar.title("⚙️ Controls")
-data_path = st.sidebar.text_input(
-    "CSV path",
-    value=(
-        "/kaggle/input/indian-e-commerce-pricing-revenue-growth/"
-        "indian_ecommerce_pricing_revenue_growth_36_months.csv"
-    ),
-)
+
+# resolve data path: secrets → env var → file uploader
+def _resolve_path():
+    # 1. Streamlit Cloud secrets
+    try:
+        return st.secrets["DATA_PATH"]
+    except Exception:
+        pass
+    # 2. environment variable
+    env = os.getenv("DATA_PATH", "")
+    if env and os.path.exists(env):
+        return env
+    return None
+
+secret_path = _resolve_path()
+
 news_key = st.sidebar.text_input("NewsAPI key (optional)", type="password")
 enrich   = st.sidebar.checkbox("Enrich with live macro data", value=True)
 
-# ── load data ─────────────────────────────────────────────────────────────────
+# ── data loading ──────────────────────────────────────────────────────────────
 @st.cache_data(show_spinner="Loading dataset…")
-def get_data(path, enrich_live, nkey):
+def get_data_from_path(path, enrich_live, nkey):
     return load(path, enrich_live=enrich_live,
                 news_api_key=nkey if nkey else None)
 
-try:
-    df = get_data(data_path, enrich, news_key)
-except Exception as e:
-    st.error(f"Could not load data: {e}")
-    st.stop()
+@st.cache_data(show_spinner="Loading dataset…")
+def get_data_from_bytes(raw_bytes, enrich_live, nkey):
+    """Load from an in-memory uploaded file."""
+    df = pd.read_csv(io.BytesIO(raw_bytes))
+    df = _clean(df)
+    df = _engineer(df)
+    return df
+
+# ── try secret/env path first, else show uploader ────────────────────────────
+df = None
+
+if secret_path:
+    try:
+        df = get_data_from_path(secret_path, enrich, news_key)
+    except Exception as e:
+        st.warning(f"Could not load from configured path: {e}")
+
+if df is None:
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📂 Upload Dataset")
+    uploaded = st.sidebar.file_uploader(
+        "Upload the Kaggle CSV",
+        type=["csv"],
+        help=(
+            "Download from Kaggle:\n"
+            "indian_ecommerce_pricing_revenue_growth_36_months.csv"
+        ),
+    )
+
+    if uploaded is not None:
+        try:
+            df = get_data_from_bytes(uploaded.read(), enrich, news_key)
+            st.sidebar.success("✅ Dataset loaded!")
+        except Exception as e:
+            st.error(f"Could not parse uploaded file: {e}")
+            st.stop()
+    else:
+        st.info(
+            "👈 **Upload your dataset to get started.**\n\n"
+            "Download the CSV from Kaggle:\n\n"
+            "[indian-e-commerce-pricing-revenue-growth]"
+            "(https://www.kaggle.com/datasets/sahilislam007/"
+            "indian-e-commerce-pricing-revenue-growth-36-months)\n\n"
+            "Then upload it using the sidebar uploader."
+        )
+        st.stop()
 
 # ── sidebar filters ───────────────────────────────────────────────────────────
 st.sidebar.markdown("---")

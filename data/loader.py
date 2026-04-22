@@ -112,7 +112,7 @@ def load(
 #  CLEANING
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _clean(df: pd.DataFrame) -> pd.DataFrame:
+def _clean(df: pd.DataFrame) -> pd.DataFrame:  # also importable directly
     df = df.copy()
     df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
     df["discount_percent"] = df["discount_percent"].clip(0, 100)
@@ -125,7 +125,7 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
 #  FEATURE ENGINEERING
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _engineer(df: pd.DataFrame) -> pd.DataFrame:
+def _engineer(df: pd.DataFrame) -> pd.DataFrame:  # also importable directly
     df = df.copy()
 
     # ── time ──────────────────────────────────────────────────────────────────
