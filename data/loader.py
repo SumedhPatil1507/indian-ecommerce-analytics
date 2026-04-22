@@ -62,8 +62,31 @@ _WB_GDP    = "NY.GDP.MKTP.KD.ZG"   # GDP growth (annual %)
 _WB_CPI    = "FP.CPI.TOTL.ZG"      # Inflation, consumer prices (annual %)
 _WB_COUNTRY = "IN"
 
-# ── FX endpoint ───────────────────────────────────────────────────────────────
-_FX_URL = "https://api.exchangerate.host/live"   # USD base, free, no key
+# ── FX endpoints (tried in order, first success wins) ────────────────────────
+# 1. fawazahmed0/exchange-api – GitHub CDN, no key, CC0 license
+#    https://github.com/fawazahmed0/exchange-api
+# 2. Frankfurter – ECB data, no key
+#    https://frankfurter.dev/
+# 3. exchangerate-api.com open access – no key
+#    https://www.exchangerate-api.com/docs/free-exchange-rate-api
+_FX_SOURCES = [
+    {
+        "url": "https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json",
+        "parse": lambda d: d.get("usd", {}).get("inr"),
+        "name": "fawazahmed0/exchange-api (CC0)",
+    },
+    {
+        "url": "https://api.frankfurter.dev/v1/latest?base=USD&symbols=INR",
+        "parse": lambda d: d.get("rates", {}).get("INR"),
+        "name": "frankfurter.dev (ECB data)",
+    },
+    {
+        "url": "https://open.er-api.com/v6/latest/USD",
+        "parse": lambda d: d.get("rates", {}).get("INR"),
+        "name": "exchangerate-api.com (open access)",
+    },
+]
+_FX_FALLBACK = 84.0   # updated periodically as a last resort
 
 # ── Google Trends keywords ────────────────────────────────────────────────────
 _TREND_KEYWORDS = [
@@ -222,35 +245,37 @@ def _enrich_worldbank(df: pd.DataFrame) -> pd.DataFrame:
 
 def fetch_usd_inr() -> float:
     """
-    Fetch the current USD → INR exchange rate from exchangerate.host (free).
+    Fetch the live USD → INR exchange rate.
+    Tries three free, no-key sources in order — first valid rate wins.
 
-    Source  : exchangerate.host – https://exchangerate.host
-    Endpoint: https://api.exchangerate.host/live?source=USD&currencies=INR
+    Sources (in priority order)
+    ───────────────────────────
+    1. fawazahmed0/exchange-api (GitHub CDN) – CC0 license
+       https://github.com/fawazahmed0/exchange-api
+    2. Frankfurter (ECB data, no key)
+       https://frankfurter.dev/
+    3. exchangerate-api.com open access
+       https://www.exchangerate-api.com/docs/free-exchange-rate-api
+    4. Hardcoded fallback: {_FX_FALLBACK}
     """
-    try:
-        resp = requests.get(
-            _FX_URL,
-            params={"source": "USD", "currencies": "INR"},
-            timeout=8,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        rate = data.get("quotes", {}).get("USDINR")
-        if rate:
-            logger.info("Live USD/INR rate: %.4f (source: exchangerate.host)", rate)
-            return float(rate)
-    except Exception as exc:
-        logger.warning("FX fetch failed: %s", exc)
-    # fallback to approximate rate
-    return 83.5
+    for source in _FX_SOURCES:
+        try:
+            resp = requests.get(source["url"], timeout=8)
+            resp.raise_for_status()
+            rate = source["parse"](resp.json())
+            if rate and float(rate) > 50:   # sanity check
+                logger.info("USD/INR %.4f from %s", rate, source["name"])
+                return float(rate)
+        except Exception as exc:
+            logger.warning("FX source %s failed: %s", source["name"], exc)
+    logger.warning("All FX sources failed – using fallback %.2f", _FX_FALLBACK)
+    return _FX_FALLBACK
 
 
 def _enrich_fx(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Add a `usd_inr_rate` column and a `revenue_usd` column for international
-    comparisons.
-
-    Citation: exchangerate.host – https://exchangerate.host (free tier)
+    Add usd_inr_rate, revenue_usd, final_price_usd columns.
+    Rate sourced from fawazahmed0/exchange-api → frankfurter → exchangerate-api.com
     """
     rate = fetch_usd_inr()
     df["usd_inr_rate"]  = rate
