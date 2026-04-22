@@ -4,7 +4,12 @@ Live URL : https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.a
 GitHub   : https://github.com/SumedhPatil1507/indian-ecommerce-analytics
 """
 import io, os, sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+
+# Resolve project root – works on local, Docker, and Streamlit Cloud
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -244,3 +249,4 @@ with tabs[8]:
     st.plotly_chart(fig2, use_container_width=True)
 st.markdown("---")
 st.caption("Citations: World Bank Open Data (CC BY 4.0) | exchangerate.host | pytrends/Google Trends (Apache 2.0) | NewsAPI.org | Kaggle: https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth")
+

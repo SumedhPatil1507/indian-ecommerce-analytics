@@ -20,7 +20,6 @@ try:
 except ImportError:
     _LIFETIMES_OK = False
 
-
 # ── RFM helper ────────────────────────────────────────────────────────────────
 
 def build_rfm(df: pd.DataFrame) -> pd.DataFrame:

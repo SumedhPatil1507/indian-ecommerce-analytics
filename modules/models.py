@@ -19,10 +19,14 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.tree import DecisionTreeRegressor
 import xgboost as xgb
 
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+    _TORCH_OK = True
+except ImportError:
+    _TORCH_OK = False
 
 # ── feature config ────────────────────────────────────────────────────────────
 CAT_FEATURES = [
@@ -88,23 +92,26 @@ def train_all(df: pd.DataFrame) -> dict:
         preds[name] = yp
         pipes[name] = pipe
 
-    # PyTorch MLP
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    mlp    = _MLP(X_tr_t.shape[1]).to(device)
-    opt    = optim.Adam(mlp.parameters(), lr=1e-3)
-    crit   = nn.MSELoss()
-    ds_tr  = TensorDataset(torch.tensor(X_tr_t, dtype=torch.float32).to(device),
-                           torch.tensor(y_tr.values, dtype=torch.float32).unsqueeze(1).to(device))
-    loader = DataLoader(ds_tr, batch_size=128, shuffle=True)
-    for _ in range(60):
-        mlp.train()
-        for bx, by in loader:
-            opt.zero_grad(); crit(mlp(bx), by).backward(); opt.step()
-    mlp.eval()
-    with torch.no_grad():
-        nn_pred = mlp(torch.tensor(X_te_t, dtype=torch.float32).to(device)).cpu().numpy().flatten()
-    results.append(_metrics("Neural Network", y_te, nn_pred))
-    preds["Neural Network"] = nn_pred
+    # PyTorch MLP (skip if torch not installed)
+    if _TORCH_OK:
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        mlp    = _MLP(X_tr_t.shape[1]).to(device)
+        opt    = optim.Adam(mlp.parameters(), lr=1e-3)
+        crit   = nn.MSELoss()
+        ds_tr  = TensorDataset(torch.tensor(X_tr_t, dtype=torch.float32).to(device),
+                               torch.tensor(y_tr.values, dtype=torch.float32).unsqueeze(1).to(device))
+        loader = DataLoader(ds_tr, batch_size=128, shuffle=True)
+        for _ in range(60):
+            mlp.train()
+            for bx, by in loader:
+                opt.zero_grad(); crit(mlp(bx), by).backward(); opt.step()
+        mlp.eval()
+        with torch.no_grad():
+            nn_pred = mlp(torch.tensor(X_te_t, dtype=torch.float32).to(device)).cpu().numpy().flatten()
+        results.append(_metrics("Neural Network", y_te, nn_pred))
+        preds["Neural Network"] = nn_pred
+    else:
+        print("PyTorch not installed – Neural Network skipped.")
 
     return {
         "results":    pd.DataFrame(results),

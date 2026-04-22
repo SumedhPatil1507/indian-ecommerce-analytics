@@ -274,23 +274,11 @@ def fetch_google_trends(
 
     Source  : Google Trends via pytrends (GeneralMills, 2023)
               https://github.com/GeneralMills/pytrends  (Apache 2.0)
-    Note    : pytrends is an unofficial API wrapper; Google may rate-limit
-              requests. Results are relative search interest (0–100).
-
-    Parameters
-    ----------
-    keywords  : list of search terms (max 5 per request)
-    timeframe : pytrends timeframe string, e.g. "today 12-m", "2022-01-01 2024-12-31"
-    geo       : ISO country code, "IN" for India
-
-    Returns
-    -------
-    pd.DataFrame indexed by date with one column per keyword
     """
     try:
         from pytrends.request import TrendReq  # type: ignore
     except ImportError:
-        logger.warning("pytrends not installed. Run: pip install pytrends")
+        logger.warning("pytrends not installed – Google Trends unavailable.")
         return pd.DataFrame()
 
     try:
