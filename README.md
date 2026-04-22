@@ -1,23 +1,29 @@
 # 🛒 Indian E-Commerce Analytics
 
-Production-grade analytics platform for Indian e-commerce pricing, revenue, and demand intelligence — built from the [Kaggle Indian E-Commerce Pricing & Revenue Growth (36 months)](https://www.kaggle.com/datasets) dataset.
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/)
+
+**Live Dashboard:** https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/  
+**GitHub:** https://github.com/SumedhPatil1507/indian-ecommerce-analytics  
+**Dataset:** https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth
+
+Production-grade analytics platform for Indian e-commerce pricing, revenue, and demand intelligence.  
+Works **without any file upload** — live synthetic data is generated from real macro signals (World Bank, FX, Google Trends).
 
 ---
 
 ## Quick Start (One-Click)
 
 ```bash
-git clone <repo>
+git clone https://github.com/SumedhPatil1507/indian-ecommerce-analytics
 cd ecommerce-analytics
 bash setup_env.sh
 source .venv/bin/activate
 
-# Streamlit dashboard
+# Streamlit dashboard (opens at http://localhost:8501)
 streamlit run dashboard/app.py
 
-# FastAPI
+# FastAPI (docs at http://localhost:8000/docs)
 uvicorn api.main:app --reload --port 8000
-# → docs at http://localhost:8000/docs
 ```
 
 ---

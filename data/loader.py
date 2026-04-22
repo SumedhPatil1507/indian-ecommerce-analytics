@@ -51,6 +51,11 @@ DEFAULT_PATH = (
     "indian_ecommerce_pricing_revenue_growth_36_months.csv"
 )
 
+KAGGLE_URL = (
+    "https://www.kaggle.com/datasets/shukla922/"
+    "indian-e-commerce-pricing-revenue-growth"
+)
+
 # ── World Bank indicator codes ────────────────────────────────────────────────
 _WB_BASE   = "https://api.worldbank.org/v2"
 _WB_GDP    = "NY.GDP.MKTP.KD.ZG"   # GDP growth (annual %)
@@ -470,3 +475,207 @@ def live_data_summary() -> None:
         print(f"  Source: https://trends.google.com  (via pytrends, Apache 2.0)")
 
     print("\n" + "=" * 65)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  MULTI-FORMAT FILE LOADER
+# ─────────────────────────────────────────────────────────────────────────────
+
+def load_any(file_obj, filename: str) -> pd.DataFrame:
+    """
+    Load a dataset from any supported file format.
+
+    Supported formats
+    ─────────────────
+    .csv          – comma-separated values
+    .tsv          – tab-separated values
+    .xlsx / .xls  – Excel workbook (first sheet)
+    .json         – records or columns orientation
+    .parquet      – Apache Parquet (requires pyarrow or fastparquet)
+
+    Parameters
+    ----------
+    file_obj : file-like object (e.g. st.file_uploader result or open())
+    filename : original filename string (used to detect format)
+
+    Returns
+    -------
+    Cleaned and feature-engineered pd.DataFrame
+    """
+    import io
+
+    ext = filename.rsplit(".", 1)[-1].lower()
+
+    # accept both raw bytes and file-like objects
+    if isinstance(file_obj, (bytes, bytearray)):
+        raw = file_obj
+    else:
+        raw = file_obj.read() if hasattr(file_obj, "read") else bytes(file_obj)
+
+    if ext == "csv":
+        df = pd.read_csv(io.BytesIO(raw))
+    elif ext == "tsv":
+        df = pd.read_csv(io.BytesIO(raw), sep="\t")
+    elif ext in ("xlsx", "xls"):
+        df = pd.read_excel(io.BytesIO(raw))
+    elif ext == "json":
+        df = pd.read_json(io.BytesIO(raw))
+    elif ext == "parquet":
+        df = pd.read_parquet(io.BytesIO(raw))
+    else:
+        raise ValueError(
+            f"Unsupported file format: .{ext}\n"
+            "Supported: .csv, .tsv, .xlsx, .xls, .json, .parquet"
+        )
+
+    return _engineer(_clean(df))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  LIVE-ONLY SYNTHETIC DATASET
+#  Generates a realistic demo dataset driven entirely by live macro signals.
+#  No Kaggle file required – the dashboard is fully functional without upload.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_CATEGORIES  = ["Electronics", "Fashion", "Grocery Essentials",
+                "Premium Lifestyle", "Home & Kitchen", "Sports & Fitness"]
+_ZONES       = ["North", "South", "East", "West", "Central"]
+_STATES      = ["Maharashtra", "Delhi", "Karnataka", "Tamil Nadu",
+                "Uttar Pradesh", "Gujarat", "West Bengal", "Rajasthan",
+                "Telangana", "Kerala", "Punjab", "Haryana"]
+_BRANDS      = ["Mass", "Premium"]
+_GENDERS     = ["Male", "Female"]
+_EVENTS      = ["Normal", "Festival"]
+_COMPETITION = ["Low", "Medium", "High"]
+_INVENTORY   = ["Low", "High"]
+
+# Festival months (India: Oct=10, Nov=11, Jan=1, Aug=8)
+_FESTIVAL_MONTHS = {10, 11, 1, 8}
+
+
+def generate_live_dataset(
+    n_rows: int = 5000,
+    months: int = 36,
+    seed: int = 42,
+) -> pd.DataFrame:
+    """
+    Generate a synthetic e-commerce dataset calibrated to live macro signals.
+
+    The generator uses:
+    - Live World Bank GDP growth  → scales revenue growth trend
+    - Live CPI inflation          → adjusts base prices upward
+    - Live USD/INR rate           → adds revenue_usd column
+    - Live Google Trends          → modulates festival/search-driven spikes
+    - Current date                → anchors the 36-month window to today
+
+    This means every refresh produces data that reflects the current
+    macroeconomic environment — no static CSV needed.
+
+    Returns
+    -------
+    Cleaned, feature-engineered pd.DataFrame (same schema as Kaggle dataset)
+    """
+    rng = np.random.default_rng(seed)
+
+    # ── fetch live signals (graceful fallback) ────────────────────────────────
+    gdp_df = fetch_worldbank(_WB_GDP)
+    cpi_df = fetch_worldbank(_WB_CPI)
+    fx     = fetch_usd_inr()
+
+    gdp_growth = gdp_df["value"].iloc[-1] / 100 if not gdp_df.empty else 0.07
+    cpi_rate   = cpi_df["value"].iloc[-1] / 100 if not cpi_df.empty else 0.05
+
+    # ── date range: last `months` months ending today ─────────────────────────
+    end_date   = pd.Timestamp.today().normalize()
+    start_date = end_date - pd.DateOffset(months=months)
+    dates      = pd.date_range(start_date, end_date, freq="D")
+
+    # ── base price calibrated to CPI ─────────────────────────────────────────
+    # Higher CPI → higher base prices
+    price_multiplier = 1 + cpi_rate
+
+    rows = []
+    for i in range(n_rows):
+        order_date = pd.Timestamp(rng.choice(dates))
+        month      = order_date.month
+        year       = order_date.year
+
+        is_festival = month in _FESTIVAL_MONTHS
+        event       = "Festival" if (is_festival and rng.random() < 0.65) else "Normal"
+
+        category    = rng.choice(_CATEGORIES)
+        brand       = rng.choice(_BRANDS)
+        zone        = rng.choice(_ZONES)
+        state       = rng.choice(_STATES)
+        gender      = rng.choice(_GENDERS)
+        age         = int(rng.integers(18, 62))
+        competition = rng.choice(_COMPETITION)
+        inventory   = rng.choice(_INVENTORY)
+
+        # price bands by category
+        price_bands = {
+            "Electronics":        (8000,  80000),
+            "Fashion":            (500,   8000),
+            "Grocery Essentials": (100,   2000),
+            "Premium Lifestyle":  (5000,  150000),
+            "Home & Kitchen":     (800,   25000),
+            "Sports & Fitness":   (600,   15000),
+        }
+        lo, hi = price_bands[category]
+        base_price = round(float(rng.uniform(lo, hi)) * price_multiplier, 2)
+
+        # discount: higher during festival, higher competition → more discount
+        disc_base = 20 if event == "Normal" else 40
+        if competition == "High":
+            disc_base += 10
+        if brand == "Premium":
+            disc_base -= 5
+        discount = float(np.clip(rng.normal(disc_base, 12), 0, 65))
+
+        final_price = round(base_price * (1 - discount / 100), 2)
+
+        # units: festival + mass brand → more volume
+        # GDP growth → slight upward trend over time
+        months_elapsed = max((order_date - start_date).days / 30, 0)
+        growth_factor  = 1 + gdp_growth * (months_elapsed / months)
+        units_base     = 30 if brand == "Mass" else 10
+        if event == "Festival":
+            units_base *= 2
+        units_sold = max(1, int(rng.normal(units_base, units_base * 0.4) * growth_factor))
+
+        revenue = round(final_price * units_sold, 2)
+
+        rows.append({
+            "order_id":             f"ORD{i:07d}",
+            "order_date":           order_date.strftime("%Y-%m-%d"),
+            "state":                state,
+            "zone":                 zone,
+            "category":             category,
+            "brand_type":           brand,
+            "customer_gender":      gender,
+            "customer_age":         age,
+            "base_price":           base_price,
+            "discount_percent":     round(discount, 1),
+            "final_price":          final_price,
+            "units_sold":           units_sold,
+            "revenue":              revenue,
+            "sales_event":          event,
+            "competition_intensity":competition,
+            "inventory_pressure":   inventory,
+        })
+
+    df = pd.DataFrame(rows)
+    df = _engineer(_clean(df))
+
+    # attach live macro columns
+    df["india_gdp_growth_pct"]    = round(gdp_growth * 100, 2)
+    df["india_cpi_inflation_pct"] = round(cpi_rate   * 100, 2)
+    df["usd_inr_rate"]            = fx
+    df["revenue_usd"]             = (df["revenue"] / fx).round(2)
+    df["data_source"]             = "live_synthetic"
+
+    logger.info(
+        "Generated %d synthetic rows (GDP=%.2f%%, CPI=%.2f%%, FX=%.2f)",
+        n_rows, gdp_growth * 100, cpi_rate * 100, fx,
+    )
+    return df
