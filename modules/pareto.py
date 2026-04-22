@@ -1,12 +1,12 @@
-"""
+﻿"""
 modules/pareto.py
-──────────────────────────────────────────────────────────────────────────────
+â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 Premium Visualisations
-  • Pareto Chart (80/20 Rule)
-  • Interactive Sunburst Chart (category → zone → brand_type)
-  • SHAP Summary Plot (interactive via Plotly)
-  • Regional Choropleth Map (India states)
-  • Advanced plots: Q-Q, Lorenz curve, ECDF, rolling stats
+  â€¢ Pareto Chart (80/20 Rule)
+  â€¢ Interactive Sunburst Chart (category â†’ zone â†’ brand_type)
+  â€¢ SHAP Summary Plot (interactive via Plotly)
+  â€¢ Regional Choropleth Map (India states)
+  â€¢ Advanced plots: Q-Q, Lorenz curve, ECDF, rolling stats
 """
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-# ── Pareto Chart ──────────────────────────────────────────────────────────────
+# â”€â”€ Pareto Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def plot_pareto(
     df: pd.DataFrame,
@@ -49,19 +49,19 @@ def plot_pareto(
     fig.add_hline(y=80, line_dash="dash", line_color="orange",
                   annotation_text="80% threshold", secondary_y=True)
     fig.update_layout(
-        title=f"Pareto Chart – {value_col.title()} by {group_col.title()} (80/20 Rule)",
+        title=f"Pareto Chart â€“ {value_col.title()} by {group_col.title()} (80/20 Rule)",
         template="plotly_white",
     )
-    fig.update_yaxes(title_text=f"Total {value_col.title()} (₹)", secondary_y=False)
+    fig.update_yaxes(title_text=f"Total {value_col.title()} (â‚¹)", secondary_y=False)
     fig.update_yaxes(title_text="Cumulative %", secondary_y=True)
     fig.show()
 
 
-# ── Sunburst Chart ────────────────────────────────────────────────────────────
+# â”€â”€ Sunburst Chart â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def plot_sunburst(df: pd.DataFrame) -> None:
     """
-    Interactive sunburst: category → zone → brand_type, sized by revenue.
+    Interactive sunburst: category â†’ zone â†’ brand_type, sized by revenue.
     """
     agg = (
         df.groupby(["category", "zone", "brand_type"])["revenue"]
@@ -72,7 +72,7 @@ def plot_sunburst(df: pd.DataFrame) -> None:
         agg,
         path=["category", "zone", "brand_type"],
         values="revenue",
-        title="Revenue Sunburst – Category → Zone → Brand Type",
+        title="Revenue Sunburst â€“ Category â†’ Zone â†’ Brand Type",
         template="plotly_white",
         color="revenue",
         color_continuous_scale="RdBu",
@@ -81,7 +81,7 @@ def plot_sunburst(df: pd.DataFrame) -> None:
     fig.show()
 
 
-# ── SHAP Summary (interactive Plotly) ────────────────────────────────────────
+# â”€â”€ SHAP Summary (interactive Plotly) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def plot_shap_summary(shap_values: np.ndarray, feature_names: list, top_n: int = 15) -> None:
     """
@@ -89,7 +89,7 @@ def plot_shap_summary(shap_values: np.ndarray, feature_names: list, top_n: int =
 
     Parameters
     ----------
-    shap_values   : 2-D array (n_samples × n_features)
+    shap_values   : 2-D array (n_samples Ã— n_features)
     feature_names : list of feature name strings
     top_n         : number of top features to show
     """
@@ -108,16 +108,16 @@ def plot_shap_summary(shap_values: np.ndarray, feature_names: list, top_n: int =
         ),
     ))
     fig.update_layout(
-        title=f"SHAP Feature Importance – Top {top_n} Features",
+        title=f"SHAP Feature Importance â€“ Top {top_n} Features",
         xaxis_title="Mean |SHAP value|",
         template="plotly_white",
     )
     fig.show()
 
 
-# ── Regional Choropleth Map ───────────────────────────────────────────────────
+# â”€â”€ Regional Choropleth Map â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-# Mapping of dataset state names → ISO 3166-2:IN codes
+# Mapping of dataset state names â†’ ISO 3166-2:IN codes
 _STATE_ISO = {
     "Andhra Pradesh":       "IN-AP",
     "Arunachal Pradesh":    "IN-AR",
@@ -166,7 +166,7 @@ def plot_choropleth(df: pd.DataFrame, metric: str = "revenue") -> None:
     agg = agg.dropna(subset=["iso"])
 
     if agg.empty:
-        print("⚠  No state → ISO mapping found. Showing bar chart instead.")
+        print("âš   No state â†’ ISO mapping found. Showing bar chart instead.")
         fig = px.bar(
             df.groupby("state")[metric].sum().nlargest(20).reset_index(),
             x=metric, y="state", orientation="h",
@@ -187,20 +187,20 @@ def plot_choropleth(df: pd.DataFrame, metric: str = "revenue") -> None:
         color=metric,
         hover_name="state",
         color_continuous_scale="YlOrRd",
-        title=f"India – {metric.replace('_',' ').title()} by State",
+        title=f"India â€“ {metric.replace('_',' ').title()} by State",
         template="plotly_white",
     )
     fig.update_geos(fitbounds="locations", visible=False)
     fig.show()
 
 
-# ── Advanced statistical plots ────────────────────────────────────────────────
+# â”€â”€ Advanced statistical plots â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 def plot_lorenz(df: pd.DataFrame, col: str = "revenue") -> None:
     vals = np.sort(df[col].dropna().values)[::-1]
     cum  = np.cumsum(vals) / vals.sum()
     x    = np.linspace(0, 1, len(cum))
-    gini = 1 - 2 * np.trapz(cum, x)
+    gini = 1 - 2 * np.trapezoid(cum, x)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines",
@@ -211,7 +211,7 @@ def plot_lorenz(df: pd.DataFrame, col: str = "revenue") -> None:
                              line=dict(color="crimson", width=2.5),
                              name=f"Lorenz curve (Gini={gini:.3f})"))
     fig.update_layout(
-        title=f"Lorenz Curve – {col.title()} Concentration  (Gini = {gini:.3f})",
+        title=f"Lorenz Curve â€“ {col.title()} Concentration  (Gini = {gini:.3f})",
         xaxis_title="Cumulative share of orders",
         yaxis_title=f"Cumulative share of {col}",
         template="plotly_white",
@@ -227,7 +227,7 @@ def plot_ecdf(df: pd.DataFrame) -> None:
         fig.add_trace(go.Scatter(x=s, y=y, mode="lines", name=col.replace("_"," ").title(),
                                  line=dict(color=colour, width=2)))
     fig.update_layout(
-        title="Empirical CDF – Revenue, Final Price, Units Sold",
+        title="Empirical CDF â€“ Revenue, Final Price, Units Sold",
         xaxis_title="Value (log scale)", yaxis_title="Cumulative Proportion",
         xaxis_type="log", template="plotly_white",
     )
@@ -251,11 +251,11 @@ def plot_rolling_stats(df: pd.DataFrame) -> None:
         x=list(roll_mean.index) + list(roll_mean.index[::-1]),
         y=list((roll_mean + roll_std).values) + list((roll_mean - roll_std).values[::-1]),
         fill="toself", fillcolor="rgba(139,0,0,0.12)",
-        line=dict(color="rgba(255,255,255,0)"), name="±1 std",
+        line=dict(color="rgba(255,255,255,0)"), name="Â±1 std",
     ))
     fig.update_layout(
         title="Revenue Trend + 3-month Rolling Statistics",
-        xaxis_title="Month", yaxis_title="Revenue (₹)",
+        xaxis_title="Month", yaxis_title="Revenue (â‚¹)",
         template="plotly_white",
     )
     fig.show()
@@ -272,3 +272,4 @@ def run_premium_visuals(df: pd.DataFrame) -> None:
     plot_lorenz(df)
     plot_ecdf(df)
     plot_rolling_stats(df)
+

@@ -241,7 +241,7 @@ with tabs[8]:
     vals = np.sort(dff["revenue"].dropna().values)[::-1]
     cum  = np.cumsum(vals)/vals.sum()
     x    = np.linspace(0,1,len(cum))
-    gini = round(1 - 2*np.trapz(cum,x), 3)
+    gini = round(1 - 2*np.trapezoid(cum,x), 3)
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(x=[0,1],y=[0,1],mode="lines",line=dict(dash="dash",color="gray"),name="Perfect equality"))
     fig2.add_trace(go.Scatter(x=x,y=cum,mode="lines",fill="tozeroy",fillcolor="rgba(220,20,60,0.12)",line=dict(color="crimson",width=2.5),name=f"Lorenz (Gini={gini})"))
@@ -249,4 +249,5 @@ with tabs[8]:
     st.plotly_chart(fig2, use_container_width=True)
 st.markdown("---")
 st.caption("Citations: World Bank Open Data (CC BY 4.0) | exchangerate.host | pytrends/Google Trends (Apache 2.0) | NewsAPI.org | Kaggle: https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth")
+
 
