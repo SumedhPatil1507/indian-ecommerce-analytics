@@ -1,0 +1,44 @@
+# Core data
+numpy>=1.26
+pandas>=2.1
+scipy>=1.11
+
+# Visualisation (interactive)
+plotly>=5.18
+kaleido>=0.2          # static export for plotly
+
+# ML
+scikit-learn>=1.4
+xgboost>=2.0
+torch>=2.1
+lifetimes>=0.11       # CLV (BG/NBD + Gamma-Gamma)
+
+# Time series
+statsmodels>=0.14
+prophet>=1.1
+
+# Explainability
+shap>=0.44
+lime>=0.2
+
+# Clustering / dimensionality reduction
+umap-learn>=0.5
+hdbscan>=0.8
+
+# Live data
+requests>=2.31
+pytrends>=4.9         # Google Trends (Apache 2.0)
+
+# API
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
+
+# Dashboard
+streamlit>=1.32
+
+# Dev / CI
+pytest>=8.0
+pytest-cov>=4.1
+ruff>=0.3
+httpx>=0.27           # API smoke tests
