@@ -2,8 +2,8 @@
 numpy>=1.26
 pandas>=2.1
 scipy>=1.11
-openpyxl>=3.1        # Excel support for load_any
-pyarrow>=14.0        # Parquet support for load_any
+openpyxl>=3.1
+pyarrow>=14.0
 
 # Visualisation
 plotly>=5.18
@@ -19,6 +19,12 @@ prophet>=1.1
 # Live data
 requests>=2.31
 
+# Auth + DB
+supabase>=2.3
+
+# Export
+fpdf2>=2.7
+
 # API
 fastapi>=0.110
 uvicorn[standard]>=0.27
@@ -26,12 +32,3 @@ pydantic>=2.5
 
 # Dashboard
 streamlit>=1.32
-
-# Optional – install locally only, not required on Streamlit Cloud
-# torch>=2.1
-# shap>=0.44
-# lime>=0.2
-# lifetimes>=0.11
-# umap-learn>=0.5
-# hdbscan>=0.8
-# pytrends>=4.9
