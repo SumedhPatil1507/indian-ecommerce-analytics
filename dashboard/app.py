@@ -1,7 +1,6 @@
-﻿"""
+"""
 dashboard/app.py  v3.0  -  IndiaCommerce Analytics
-Premium analytics platform. No auth dependencies.
-Live macro data always visible. Multi-format file upload.
+Premium analytics platform. Live macro data. Multi-format file upload.
 """
 import io, os, sys
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -31,80 +30,88 @@ from modules.model_drift     import compute_drift, compute_prediction_drift, plo
 st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
 
-st.markdown("""<style>
-[data-testid="stAppViewContainer"]{background:#f1f5f9}
-[data-testid="stSidebar"]{background:#0f172a}
-[data-testid="stSidebar"] *{color:#e2e8f0!important}
-[data-testid="stSidebar"] .stMarkdown h3{color:#a5b4fc!important;font-size:1rem!important}
-[data-testid="stSidebar"] hr{border-color:#1e293b!important}
-[data-testid="metric-container"]{background:#fff;border:1px solid #cbd5e1;border-radius:12px;
-  padding:16px 20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-[data-testid="metric-container"] [data-testid="stMetricValue"]{font-size:1.4rem;font-weight:700;color:#0f172a}
-[data-testid="metric-container"] [data-testid="stMetricLabel"]{color:#475569;font-weight:600}
-.stTabs [data-baseweb="tab-list"]{background:#fff;border-radius:10px;padding:4px;border:1px solid #cbd5e1;gap:2px}
-.stTabs [data-baseweb="tab"]{border-radius:8px;font-weight:500;color:#475569;padding:6px 14px}
-.stTabs [aria-selected="true"]{background:#4f46e5!important;color:#fff!important}
-.stButton>button[kind="primary"]{background:#4f46e5;border:none;border-radius:8px;font-weight:600;padding:8px 20px}
-.stButton>button[kind="primary"]:hover{background:#4338ca}
-
-/* ---- Executive Summary cards ---- */
+CSS = """
+<style>
+html,body,[class*="css"],.stApp,.main,.block-container,
+p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,
+.stMarkdown,.stMarkdown p,.stMarkdown span,
+[data-testid="stMarkdownContainer"],
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] span,
+[data-testid="stMarkdownContainer"] li,
+.stSelectbox label,.stMultiSelect label,
+.stSlider label,.stFileUploader label,
+.stCheckbox label,.stRadio label,
+.stExpander summary,.stExpander p,
+[data-testid="stExpander"] p,
+[data-testid="stExpander"] span,
+[data-testid="stCaptionContainer"] p {
+  color:#0f172a !important;
+}
+[data-testid="stAppViewContainer"]{background:#f1f5f9 !important}
+.main .block-container{padding-top:1.5rem}
+[data-testid="stSidebar"]{background:#0f172a !important}
+[data-testid="stSidebar"] *,[data-testid="stSidebar"] p,
+[data-testid="stSidebar"] span,[data-testid="stSidebar"] label,
+[data-testid="stSidebar"] div{color:#e2e8f0 !important}
+[data-testid="stSidebar"] h3{color:#a5b4fc !important;font-size:1rem !important}
+[data-testid="stSidebar"] hr{border-color:#1e293b !important}
+[data-testid="stSidebar"] .stButton>button{
+  background:#1e293b !important;color:#e2e8f0 !important;
+  border:1px solid #334155 !important;border-radius:8px !important}
+[data-testid="stSidebar"] .stButton>button:hover{background:#334155 !important}
+[data-testid="metric-container"]{
+  background:#ffffff !important;border:1px solid #cbd5e1 !important;
+  border-radius:12px !important;padding:16px 20px !important;
+  box-shadow:0 2px 8px rgba(0,0,0,.08) !important}
+[data-testid="stMetricValue"]{font-size:1.5rem !important;font-weight:700 !important;color:#0f172a !important}
+[data-testid="stMetricLabel"]{font-size:.85rem !important;font-weight:600 !important;color:#475569 !important}
+.stTabs [data-baseweb="tab-list"]{
+  background:#ffffff !important;border-radius:10px !important;
+  padding:4px !important;border:1px solid #cbd5e1 !important;gap:2px !important}
+.stTabs [data-baseweb="tab"]{
+  border-radius:8px !important;font-weight:600 !important;
+  color:#334155 !important;padding:6px 14px !important}
+.stTabs [aria-selected="true"]{background:#4f46e5 !important;color:#ffffff !important}
+.stButton>button[kind="primary"]{
+  background:#4f46e5 !important;border:none !important;
+  border-radius:8px !important;font-weight:600 !important;
+  color:#ffffff !important;padding:8px 20px !important}
+.stButton>button[kind="primary"]:hover{background:#4338ca !important}
+.stButton>button[kind="secondary"]{
+  border:1px solid #cbd5e1 !important;color:#0f172a !important;
+  border-radius:8px !important;font-weight:500 !important}
+[data-testid="stDataFrame"] td,[data-testid="stDataFrame"] th{color:#0f172a !important;font-size:.9rem !important}
+[data-testid="stExpander"]{
+  background:#ffffff !important;border:1px solid #e2e8f0 !important;border-radius:10px !important}
+[data-testid="stExpander"] summary{color:#0f172a !important;font-weight:600 !important}
+[data-testid="stCaptionContainer"] p{color:#475569 !important;font-size:.82rem !important}
 .card{
-  background:#ffffff;
-  border:1px solid #cbd5e1;
-  border-radius:12px;
-  padding:18px 22px;
-  margin:8px 0;
-  box-shadow:0 2px 6px rgba(0,0,0,.07);
-  color:#7f1d1d;
-  font-size:.95rem;
-  line-height:1.6;
-}
-.card-blue{
-  border-left:5px solid #4f46e5;
-  background:#eef2ff;
-  color:#1e1b4b;
-}
-.card-red{
-  border-left:5px solid #dc2626;
-  background:#fef2f2;
-  color:#7f1d1d;
-}
-.card-green{
-  border-left:5px solid #16a34a;
-  background:#f0fdf4;
-  color:#14532d;
-}
-.card-amber{
-  border-left:5px solid #d97706;
-  background:#fffbeb;
-  color:#78350f;
-}
-.card strong, .card b{color:inherit;font-weight:700}
+  background:#ffffff;border:1px solid #cbd5e1;border-radius:12px;
+  padding:18px 22px;margin:8px 0;box-shadow:0 2px 6px rgba(0,0,0,.07);
+  color:#0f172a;font-size:.95rem;line-height:1.6}
+.card-blue{border-left:5px solid #4f46e5;background:#eef2ff;color:#1e1b4b}
+.card-red{border-left:5px solid #dc2626;background:#fef2f2;color:#7f1d1d}
+.card-green{border-left:5px solid #16a34a;background:#f0fdf4;color:#14532d}
+.card-amber{border-left:5px solid #d97706;background:#fffbeb;color:#78350f}
+.card strong,.card b{color:inherit;font-weight:700}
 .rec-card{
-  background:#ffffff;
-  border:1px solid #cbd5e1;
-  border-radius:12px;
-  padding:18px 22px;
-  margin:10px 0;
-  box-shadow:0 2px 6px rgba(0,0,0,.07);
-}
+  background:#ffffff;border:1px solid #cbd5e1;border-radius:12px;
+  padding:18px 22px;margin:10px 0;box-shadow:0 2px 6px rgba(0,0,0,.07)}
 .rec-card .rec-title{font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:6px}
 .rec-card .rec-action{font-size:.95rem;color:#1e293b;margin-bottom:6px}
 .rec-card .rec-meta{font-size:.82rem;color:#475569}
-.section-title{font-size:1.1rem;font-weight:700;color:#0f172a;margin:20px 0 10px;
-  padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+.section-title{
+  font-size:1.1rem;font-weight:700;color:#0f172a;
+  margin:20px 0 10px;padding-bottom:6px;border-bottom:2px solid #e2e8f0}
 .headline-card{
   background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);
-  color:#ffffff!important;
-  border-radius:14px;
-  padding:22px 28px;
-  margin-bottom:20px;
-  font-size:1.15rem;
-  font-weight:600;
-  line-height:1.5;
-  box-shadow:0 4px 16px rgba(79,70,229,.3);
-}
-</style>""", unsafe_allow_html=True)
+  color:#ffffff !important;border-radius:14px;padding:22px 28px;
+  margin-bottom:20px;font-size:1.15rem;font-weight:600;line-height:1.5;
+  box-shadow:0 4px 16px rgba(79,70,229,.3)}
+</style>
+"""
+st.markdown(CSS, unsafe_allow_html=True)
 
 #  Cached live data (1 hour TTL) 
 @st.cache_data(ttl=3600, show_spinner=False)
