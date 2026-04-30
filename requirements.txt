@@ -32,3 +32,6 @@ pydantic>=2.5
 
 # Dashboard
 streamlit>=1.32
+
+# Environment variable loading (local dev only)
+python-dotenv>=1.0

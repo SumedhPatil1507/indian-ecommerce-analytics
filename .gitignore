@@ -22,6 +22,9 @@ env/
 # Streamlit secrets – NEVER commit
 .streamlit/secrets.toml
 
+# Environment variables – NEVER commit
+.env
+
 # Jupyter
 .ipynb_checkpoints/
 *.ipynb

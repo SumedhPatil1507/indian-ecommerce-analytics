@@ -1,11 +1,18 @@
 """
 core/config.py — centralised environment-based configuration.
-All secrets come from environment variables or Streamlit secrets.
+All secrets come from .env (local) or Streamlit secrets (cloud).
 Never hardcoded.
 """
 from __future__ import annotations
 import os
 from dataclasses import dataclass, field
+
+# Load .env file automatically if python-dotenv is available
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except ImportError:
+    pass  # dotenv not required in production (env vars set directly)
 
 
 def _env(key: str, default: str = "") -> str:
