@@ -88,7 +88,6 @@ def score_churn_risk(cust: pd.DataFrame) -> pd.DataFrame:
 
 def generate_at_risk_alerts(
     df: pd.DataFrame,
-    user_id: str = "",
     top_n: int = 50,
 ) -> pd.DataFrame:
     """
@@ -107,16 +106,10 @@ def generate_at_risk_alerts(
 
     at_risk["recommended_action"] = at_risk.apply(_recommend_action, axis=1)
     at_risk["alert_generated_at"] = datetime.now(timezone.utc).isoformat()
-
-    # Persist to Supabase
-    if user_id and not at_risk.empty:
-        _save_alerts(at_risk, user_id)
-
     return at_risk
 
 
-def _recommend_action(row: pd.Series) -> str:
-    if row["risk_label"] == "Critical" and row["value_tier"] == "High Value":
+def _recommend_action(row: pd.Series) -> str:    if row["risk_label"] == "Critical" and row["value_tier"] == "High Value":
         return f"Immediate outreach — offer {min(row['avg_discount']+10, 40):.0f}% personalised discount on {row['top_category']}"
     if row["risk_label"] == "High" and row["value_tier"] == "High Value":
         return f"Send win-back email with loyalty reward for {row['top_category']} purchase"
@@ -125,27 +118,6 @@ def _recommend_action(row: pd.Series) -> str:
     return "Add to re-engagement drip sequence"
 
 
-def _save_alerts(at_risk: pd.DataFrame, user_id: str) -> None:
-    try:
-        from core.database import _client
-        client = _client()
-        if not client:
-            return
-        records = []
-        for _, row in at_risk.iterrows():
-            records.append({
-                "user_id":            user_id,
-                "customer_id":        str(row["customer_id"]),
-                "churn_risk_score":   float(row["churn_risk_score"]),
-                "risk_label":         row["risk_label"],
-                "value_tier":         row["value_tier"],
-                "days_since_order":   int(row["days_since_last_order"]),
-                "total_revenue":      float(row["total_revenue"]),
-                "recommended_action": row["recommended_action"],
-                "created_at":         row["alert_generated_at"],
-            })
-        client.table("at_risk_alerts").upsert(records).execute()
-        logger.info("Saved %d at-risk alerts to Supabase", len(records))
     except Exception as e:
         logger.warning("At-risk alert save failed: %s", e)
 
@@ -176,3 +148,4 @@ def plot_at_risk(at_risk: pd.DataFrame):
     )
 
     return fig1, fig2
+
