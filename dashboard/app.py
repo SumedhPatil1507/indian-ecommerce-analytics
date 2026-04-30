@@ -1,4 +1,4 @@
-"""
+﻿"""
 dashboard/app.py  v3.0  -  IndiaCommerce Analytics
 Premium analytics platform. No auth dependencies.
 Live macro data always visible. Multi-format file upload.
@@ -55,7 +55,7 @@ st.markdown("""<style>
   padding:18px 22px;
   margin:8px 0;
   box-shadow:0 2px 6px rgba(0,0,0,.07);
-  color:#0f172a;
+  color:#7f1d1d;
   font-size:.95rem;
   line-height:1.6;
 }
