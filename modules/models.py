@@ -28,7 +28,7 @@ try:
 except ImportError:
     _TORCH_OK = False
 
-# ── feature config ────────────────────────────────────────────────────────────
+#  feature config 
 CAT_FEATURES = [
     "state", "zone", "category", "brand_type", "customer_gender",
     "sales_event", "competition_intensity", "inventory_pressure",
@@ -45,7 +45,7 @@ def _preprocessor() -> ColumnTransformer:
     ])
 
 
-# ── MLP ───────────────────────────────────────────────────────────────────────
+#  MLP 
 
 class _MLP(nn.Module):
     def __init__(self, n_in: int):
@@ -60,7 +60,7 @@ class _MLP(nn.Module):
         return self.net(x)
 
 
-# ── train / evaluate ──────────────────────────────────────────────────────────
+#  train / evaluate 
 
 def train_all(df: pd.DataFrame) -> dict:
     """
@@ -111,7 +111,7 @@ def train_all(df: pd.DataFrame) -> dict:
         results.append(_metrics("Neural Network", y_te, nn_pred))
         preds["Neural Network"] = nn_pred
     else:
-        print("PyTorch not installed – Neural Network skipped.")
+        print("PyTorch not installed  Neural Network skipped.")
 
     return {
         "results":    pd.DataFrame(results),
@@ -130,20 +130,20 @@ def _metrics(name, y_true, y_pred) -> dict:
         "name": name,
         "RMSE": np.sqrt(mse),
         "MAE":  mean_absolute_error(y_true, y_pred),
-        "R²":   r2_score(y_true, y_pred),
+        "R":   r2_score(y_true, y_pred),
     }
 
 
-# ── comparison plots ──────────────────────────────────────────────────────────
+#  comparison plots 
 
 def plot_comparison(output: dict) -> None:
     res = output["results"]
 
     fig = make_subplots(rows=1, cols=2,
-                        subplot_titles=["RMSE (lower = better)", "R² (higher = better)"])
+                        subplot_titles=["RMSE (lower = better)", "R (higher = better)"])
     fig.add_trace(go.Bar(x=res["name"], y=res["RMSE"], name="RMSE",
                          marker_color="indianred"), row=1, col=1)
-    fig.add_trace(go.Bar(x=res["name"], y=res["R²"],   name="R²",
+    fig.add_trace(go.Bar(x=res["name"], y=res["R"],   name="R",
                          marker_color="steelblue"), row=1, col=2)
     fig.update_layout(title="Model Comparison", template="plotly_white",
                       showlegend=False)
@@ -154,7 +154,7 @@ def plot_comparison(output: dict) -> None:
     for name, yp in output["preds"].items():
         fig = px.scatter(x=y_te, y=yp, opacity=0.4,
                          labels={"x": "Actual Revenue", "y": "Predicted Revenue"},
-                         title=f"Actual vs Predicted – {name}",
+                         title=f"Actual vs Predicted  {name}",
                          template="plotly_white")
         mn, mx = y_te.min(), y_te.max()
         fig.add_trace(go.Scatter(x=[mn, mx], y=[mn, mx],
@@ -168,7 +168,7 @@ def plot_comparison(output: dict) -> None:
         resid = y_te - xgb_pred
         fig = px.scatter(x=xgb_pred, y=resid, opacity=0.4,
                          labels={"x": "Predicted", "y": "Residual"},
-                         title="Residual Plot – XGBoost",
+                         title="Residual Plot  XGBoost",
                          template="plotly_white")
         fig.add_hline(y=0, line_dash="dash", line_color="red")
         fig.show()

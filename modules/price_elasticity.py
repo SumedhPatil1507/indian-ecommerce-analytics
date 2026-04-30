@@ -1,11 +1,11 @@
 """
 modules/price_elasticity.py
-──────────────────────────────────────────────────────────────────────────────
+
 Price Elasticity Engine
-  • Computes own-price elasticity of demand per category / zone / brand_type
-  • Log-log OLS regression: ln(units) = α + β·ln(price) + controls
-  • β is the price elasticity coefficient
-  • Interactive Plotly heatmap + waterfall chart
+   Computes own-price elasticity of demand per category / zone / brand_type
+   Log-log OLS regression: ln(units) =  + ln(price) + controls
+    is the price elasticity coefficient
+   Interactive Plotly heatmap + waterfall chart
 """
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ import statsmodels.api as sm
 from itertools import product
 
 
-# ── core elasticity computation ───────────────────────────────────────────────
+#  core elasticity computation 
 
 def compute_elasticity(
     df: pd.DataFrame,
@@ -30,10 +30,10 @@ def compute_elasticity(
     Returns a DataFrame with columns: [*group_cols, elasticity, r2, n_obs, p_value]
 
     Interpretation
-    ──────────────
-    elasticity < -1  → elastic demand  (price-sensitive)
-    -1 < elasticity < 0 → inelastic demand
-    elasticity > 0   → Giffen / luxury good signal
+    
+    elasticity < -1   elastic demand  (price-sensitive)
+    -1 < elasticity < 0  inelastic demand
+    elasticity > 0    Giffen / luxury good signal
     """
     records = []
     for keys, grp in df.groupby(group_cols):
@@ -63,15 +63,15 @@ def compute_elasticity(
     return pd.DataFrame(records).sort_values("elasticity")
 
 
-# ── plots ─────────────────────────────────────────────────────────────────────
+#  plots 
 
 def plot_elasticity_heatmap(df: pd.DataFrame) -> None:
     """
-    Heatmap of price elasticity: category × zone.
+    Heatmap of price elasticity: category  zone.
     """
     elast = compute_elasticity(df, group_cols=["category", "zone"])
     if elast.empty:
-        print("Not enough data for category × zone elasticity.")
+        print("Not enough data for category  zone elasticity.")
         return
 
     pivot = elast.pivot(index="category", columns="zone", values="elasticity")
@@ -79,8 +79,8 @@ def plot_elasticity_heatmap(df: pd.DataFrame) -> None:
         pivot,
         color_continuous_scale="RdBu",
         color_continuous_midpoint=0,
-        title="Price Elasticity Heatmap – Category × Zone",
-        labels={"color": "Elasticity (β)"},
+        title="Price Elasticity Heatmap  Category  Zone",
+        labels={"color": "Elasticity ()"},
         text_auto=".2f",
         template="plotly_white",
     )
@@ -110,12 +110,12 @@ def plot_elasticity_waterfall(df: pd.DataFrame) -> None:
             "Giffen / Luxury":"gold",
         },
         title="Price Elasticity by Category",
-        labels={"elasticity": "Elasticity Coefficient (β)", "category": "Category"},
+        labels={"elasticity": "Elasticity Coefficient ()", "category": "Category"},
         template="plotly_white",
         text="elasticity",
     )
     fig.add_vline(x=-1, line_dash="dash", line_color="gray",
-                  annotation_text="Elastic threshold (β = -1)")
+                  annotation_text="Elastic threshold ( = -1)")
     fig.add_vline(x=0,  line_dash="dot",  line_color="black")
     fig.show()
 
@@ -127,8 +127,8 @@ def plot_elasticity_by_brand(df: pd.DataFrame) -> None:
     fig = px.bar(
         elast, x="category", y="elasticity", color="brand_type",
         barmode="group",
-        title="Price Elasticity – Mass vs Premium by Category",
-        labels={"elasticity": "Elasticity (β)"},
+        title="Price Elasticity  Mass vs Premium by Category",
+        labels={"elasticity": "Elasticity ()"},
         template="plotly_white",
     )
     fig.add_hline(y=-1, line_dash="dash", line_color="red",
@@ -137,7 +137,7 @@ def plot_elasticity_by_brand(df: pd.DataFrame) -> None:
 
 
 def run_elasticity_engine(df: pd.DataFrame) -> None:
-    """Entry point – run all elasticity plots."""
+    """Entry point  run all elasticity plots."""
     print("=" * 60)
     print("  PRICE ELASTICITY ENGINE")
     print("=" * 60)
@@ -156,9 +156,9 @@ def run_elasticity_engine(df: pd.DataFrame) -> None:
     for _, row in summary.iterrows():
         e = row["elasticity"]
         if e < -1:
-            rec = "Aggressive discounting justified – demand is elastic"
+            rec = "Aggressive discounting justified  demand is elastic"
         elif -1 <= e < 0:
-            rec = "Moderate discounts – demand is inelastic, protect margins"
+            rec = "Moderate discounts  demand is inelastic, protect margins"
         else:
-            rec = "Luxury / Giffen signal – discounting may reduce perceived value"
-        print(f"  {row['category']:<30} β={e:+.3f}  → {rec}")
+            rec = "Luxury / Giffen signal  discounting may reduce perceived value"
+        print(f"  {row['category']:<30} ={e:+.3f}   {rec}")

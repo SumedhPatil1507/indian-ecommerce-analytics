@@ -1,6 +1,6 @@
 """
 modules/eda.py
-Exploratory Data Analysis – distributions, categorical plots, pie charts,
+Exploratory Data Analysis  distributions, categorical plots, pie charts,
 boxplots, violin plots.  All plots are interactive (Plotly).
 """
 import numpy as np
@@ -10,7 +10,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-# ── Histograms ────────────────────────────────────────────────────────────────
+#  Histograms 
 
 def plot_distributions(df: pd.DataFrame) -> None:
     cols = {
@@ -34,12 +34,12 @@ def plot_distributions(df: pd.DataFrame) -> None:
     fig.add_trace(go.Histogram(x=df["final_price"], name="Final Price", opacity=0.65, nbinsx=60))
     fig.update_layout(
         barmode="overlay", title="Base Price vs Final Price Distribution",
-        xaxis_title="Price (₹)", yaxis_title="Count", template="plotly_white",
+        xaxis_title="Price ()", yaxis_title="Count", template="plotly_white",
     )
     fig.show()
 
 
-# ── Categorical bar plots ─────────────────────────────────────────────────────
+#  Categorical bar plots 
 
 def plot_categorical(df: pd.DataFrame) -> None:
     cat_cols   = ["category", "zone", "brand_type", "sales_event",
@@ -58,7 +58,7 @@ def plot_categorical(df: pd.DataFrame) -> None:
             fig.show()
 
 
-# ── Count plots ───────────────────────────────────────────────────────────────
+#  Count plots 
 
 def plot_counts(df: pd.DataFrame) -> None:
     count_cols = ["category", "zone", "brand_type", "sales_event",
@@ -84,14 +84,14 @@ def plot_counts(df: pd.DataFrame) -> None:
     fig.show()
 
 
-# ── Pie charts ────────────────────────────────────────────────────────────────
+#  Pie charts 
 
 def plot_pies(df: pd.DataFrame) -> None:
     pie_specs = [
         ("category",             "Revenue Share by Product Category"),
         ("zone",                 "Revenue Share by Zone"),
-        ("sales_event",          "Revenue – Festival vs Normal"),
-        ("brand_type",           "Revenue Share – Mass vs Premium"),
+        ("sales_event",          "Revenue  Festival vs Normal"),
+        ("brand_type",           "Revenue Share  Mass vs Premium"),
         ("customer_gender",      "Order Distribution by Gender"),
         ("competition_intensity","Revenue Share by Competition Intensity"),
     ]
@@ -104,17 +104,17 @@ def plot_pies(df: pd.DataFrame) -> None:
     # top 8 states
     state_rev = df.groupby("state")["revenue"].sum().nlargest(8).reset_index()
     fig = px.pie(state_rev, names="state", values="revenue",
-                 title="Revenue Share – Top 8 States", hole=0.4,
+                 title="Revenue Share  Top 8 States", hole=0.4,
                  template="plotly_white")
     fig.show()
 
 
-# ── Boxplots ──────────────────────────────────────────────────────────────────
+#  Boxplots 
 
 def plot_boxplots(df: pd.DataFrame) -> None:
     specs = [
         ("category",             "final_price",      "Final Price by Category (log)"),
-        ("sales_event",          "discount_percent",  "Discount % – Normal vs Festival"),
+        ("sales_event",          "discount_percent",  "Discount %  Normal vs Festival"),
         ("zone",                 "revenue",           "Revenue by Zone (log)"),
         ("competition_intensity","final_price",       "Final Price by Competition Level"),
     ]
@@ -124,19 +124,19 @@ def plot_boxplots(df: pd.DataFrame) -> None:
                      template="plotly_white", color=x_col)
         fig.show()
 
-    # units sold – brand × event
+    # units sold  brand  event
     fig = px.box(df, x="brand_type", y="units_sold", color="sales_event",
-                 title="Units Sold – Mass vs Premium × Normal/Festival",
+                 title="Units Sold  Mass vs Premium  Normal/Festival",
                  template="plotly_white")
     fig.show()
 
 
-# ── Violin plots ──────────────────────────────────────────────────────────────
+#  Violin plots 
 
 def plot_violins(df: pd.DataFrame) -> None:
     specs = [
         ("category",             "final_price",      "Final Price by Category"),
-        ("sales_event",          "discount_percent",  "Discount % – Normal vs Festival"),
+        ("sales_event",          "discount_percent",  "Discount %  Normal vs Festival"),
         ("zone",                 "revenue",           "Revenue by Zone"),
         ("competition_intensity","final_price",       "Final Price by Competition"),
     ]
@@ -146,9 +146,9 @@ def plot_violins(df: pd.DataFrame) -> None:
                         log_y=(y_col in ["final_price", "revenue"]))
         fig.show()
 
-    # split violin – units sold by brand × event
+    # split violin  units sold by brand  event
     fig = px.violin(df, x="brand_type", y="units_sold", color="sales_event",
                     box=True, points=False,
-                    title="Units Sold – Mass vs Premium × Normal/Festival",
+                    title="Units Sold  Mass vs Premium  Normal/Festival",
                     template="plotly_white")
     fig.show()

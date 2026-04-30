@@ -1,12 +1,12 @@
 """
 modules/clv.py
-──────────────────────────────────────────────────────────────────────────────
+
 Customer Lifetime Value (CLV) Predictor
-  • BG/NBD model for purchase frequency (via lifetimes library)
-  • Gamma-Gamma model for monetary value
-  • CLV = predicted_purchases × predicted_avg_order_value × margin
-  • Segments customers into CLV tiers (Champions, Loyalists, At-Risk, Lost)
-  • Interactive Plotly visualisations
+   BG/NBD model for purchase frequency (via lifetimes library)
+   Gamma-Gamma model for monetary value
+   CLV = predicted_purchases  predicted_avg_order_value  margin
+   Segments customers into CLV tiers (Champions, Loyalists, At-Risk, Lost)
+   Interactive Plotly visualisations
 """
 import numpy as np
 import pandas as pd
@@ -20,7 +20,7 @@ try:
 except ImportError:
     _LIFETIMES_OK = False
 
-# ── RFM helper ────────────────────────────────────────────────────────────────
+#  RFM helper 
 
 def build_rfm(df: pd.DataFrame) -> pd.DataFrame:
     """
@@ -51,7 +51,7 @@ def build_rfm(df: pd.DataFrame) -> pd.DataFrame:
     return rfm
 
 
-# ── BG/NBD + Gamma-Gamma CLV ──────────────────────────────────────────────────
+#  BG/NBD + Gamma-Gamma CLV 
 
 def compute_clv(
     df: pd.DataFrame,
@@ -77,7 +77,7 @@ def compute_clv(
     rfm = build_rfm(df)
 
     if not _LIFETIMES_OK:
-        print("⚠  lifetimes not installed – using simple RFM CLV.")
+        print("  lifetimes not installed  using simple RFM CLV.")
         print("   Install with: pip install lifetimes")
         return _simple_clv(rfm, time_horizon, margin)
 
@@ -134,7 +134,7 @@ def _add_tiers(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── plots ─────────────────────────────────────────────────────────────────────
+#  plots 
 
 def plot_clv(df: pd.DataFrame) -> None:
     clv_df = compute_clv(df)
@@ -142,7 +142,7 @@ def plot_clv(df: pd.DataFrame) -> None:
     # distribution
     fig = px.histogram(clv_df, x="clv", nbins=60, color="clv_tier",
                        title="CLV Distribution by Tier",
-                       labels={"clv": "Customer Lifetime Value (₹)"},
+                       labels={"clv": "Customer Lifetime Value ()"},
                        template="plotly_white", marginal="box")
     fig.show()
 
@@ -158,7 +158,7 @@ def plot_clv(df: pd.DataFrame) -> None:
     fig = px.scatter(clv_df, x="frequency", y="clv", color="clv_tier",
                      opacity=0.6, size="monetary",
                      title="Purchase Frequency vs CLV",
-                     labels={"frequency": "Purchase Frequency", "clv": "CLV (₹)"},
+                     labels={"frequency": "Purchase Frequency", "clv": "CLV ()"},
                      template="plotly_white",
                      color_discrete_sequence=px.colors.qualitative.Set2)
     fig.show()

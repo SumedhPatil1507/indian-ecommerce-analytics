@@ -1,4 +1,4 @@
-# Core
+# Core data
 numpy>=1.26
 pandas>=2.1
 scipy>=1.11
@@ -11,24 +11,24 @@ plotly>=5.18
 # ML
 scikit-learn>=1.4
 xgboost>=2.0
-
-# Time series
 statsmodels>=0.14
-prophet>=1.1
 
-# Live data
-requests>=2.31
+# Forecasting
+prophet>=1.1
 
 # Export
 fpdf2>=2.7
 
-# API
-fastapi>=0.110
-uvicorn[standard]>=0.27
-pydantic>=2.5
+# Live data
+requests>=2.31
 
 # Dashboard
 streamlit>=1.32
+
+# API (optional, not needed for Streamlit Cloud)
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.5
 
 # Dev
 python-dotenv>=1.0

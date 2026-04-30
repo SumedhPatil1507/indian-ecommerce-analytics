@@ -1,4 +1,4 @@
-﻿"""core/config.py - App configuration. No external auth dependencies."""
+"""core/config.py - App configuration. No external auth dependencies."""
 from __future__ import annotations
 import os
 

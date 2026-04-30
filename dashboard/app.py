@@ -1,4 +1,4 @@
-﻿"""
+"""
 dashboard/app.py  v3.0  -  IndiaCommerce Analytics
 Premium analytics platform. No auth dependencies.
 Live macro data always visible. Multi-format file upload.
@@ -28,7 +28,7 @@ from modules.price_optimizer import run_price_optimizer, plot_price_optimizer
 from modules.at_risk         import generate_at_risk_alerts, plot_at_risk
 from modules.model_drift     import compute_drift, compute_prediction_drift, plot_drift
 
-st.set_page_config(page_title=cfg.APP_NAME, page_icon="📊",
+st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""<style>
@@ -53,7 +53,7 @@ st.markdown("""<style>
 .section-title{font-size:1.05rem;font-weight:700;color:#1e293b;margin:16px 0 8px}
 </style>""", unsafe_allow_html=True)
 
-# ── Cached live data (1 hour TTL) ─────────────────────────────────────────────
+#  Cached live data (1 hour TTL) 
 @st.cache_data(ttl=3600, show_spinner=False)
 def _live_macro():
     return fetch_worldbank(_WB_GDP), fetch_worldbank(_WB_CPI), fetch_usd_inr()
@@ -67,13 +67,13 @@ def _live_trends():
 def _from_upload(raw: bytes, fname: str) -> pd.DataFrame:
     return load_any(io.BytesIO(raw), fname)
 
-# ── SIDEBAR ───────────────────────────────────────────────────────────────────
+#  SIDEBAR 
 with st.sidebar:
     st.markdown(f"### {cfg.APP_NAME}")
     st.caption(f"v{cfg.APP_VERSION}")
     st.markdown("---")
 
-    # ── Data source ───────────────────────────────────────────────────────────
+    #  Data source 
     st.markdown("### Data Source")
     df = st.session_state.get("df")
 
@@ -104,13 +104,13 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── Live data controls ────────────────────────────────────────────────────
+    #  Live data controls 
     st.markdown("### Live Signals")
     if st.button("Refresh live data", use_container_width=True):
         st.cache_data.clear(); st.rerun()
     st.caption("Auto-refreshes every hour.")
 
-    # ── Filters (only when data loaded) ──────────────────────────────────────
+    #  Filters (only when data loaded) 
     if df is not None:
         st.markdown("---")
         st.markdown("### Filters")
@@ -119,21 +119,21 @@ with st.sidebar:
         brands = st.multiselect("Brand Type",  sorted(df["brand_type"].unique()), default=sorted(df["brand_type"].unique()))
         events = st.multiselect("Sales Event", sorted(df["sales_event"].unique()),default=sorted(df["sales_event"].unique()))
 
-# ── HEADER ────────────────────────────────────────────────────────────────────
+#  HEADER 
 st.markdown(f"""
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
-  <span style="font-size:2rem">📊</span>
+  <span style="font-size:2rem"></span>
   <span style="font-size:1.75rem;font-weight:800;color:#1e293b">{cfg.APP_NAME}</span>
 </div>
 <p style="color:#64748b;font-size:.9rem;margin-bottom:20px">
   <a href="https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/" target="_blank">Live App</a>
-  &nbsp;·&nbsp;
+  &nbsp;&nbsp;
   <a href="https://github.com/SumedhPatil1507/indian-ecommerce-analytics" target="_blank">GitHub</a>
-  &nbsp;·&nbsp; World Bank (CC BY 4.0) · fawazahmed0/exchange-api (CC0) · pytrends (Apache 2.0)
+  &nbsp;&nbsp; World Bank (CC BY 4.0)  fawazahmed0/exchange-api (CC0)  pytrends (Apache 2.0)
 </p>
 """, unsafe_allow_html=True)
 
-# ── LIVE MACRO (always visible, no dataset needed) ────────────────────────────
+#  LIVE MACRO (always visible, no dataset needed) 
 gdp_df, cpi_df, fx = _live_macro()
 trends_df = _live_trends()
 
@@ -150,7 +150,7 @@ c2.metric("CPI Inflation",     f"{cpi_val:.2f}%"      if cpi_val  else "N/A",
           delta=f"{cpi_delta:+.2f}pp" if cpi_delta else None, help="World Bank Open Data (CC BY 4.0)")
 c3.metric("USD / INR",         f"Rs{fx:.2f}",          help="fawazahmed0/exchange-api (CC0)")
 c4.metric("Search Interest",   f"{trend_val:.1f}/100" if trend_val else "N/A",
-          help="Google Trends via pytrends (Apache 2.0) · India · last 3 months")
+          help="Google Trends via pytrends (Apache 2.0)  India  last 3 months")
 
 with st.expander("GDP & CPI history (World Bank)", expanded=False):
     col1,col2 = st.columns(2)
@@ -176,12 +176,12 @@ if not trends_df.empty:
 
 st.markdown("---")
 
-# ── NO DATA STATE ─────────────────────────────────────────────────────────────
+#  NO DATA STATE 
 if df is None:
     st.markdown(f"""
     <div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;
          border:1px solid #e2e8f0;margin-top:20px">
-      <div style="font-size:3rem">📂</div>
+      <div style="font-size:3rem"></div>
       <h2 style="color:#1e293b;margin:12px 0 8px">Upload your dataset to unlock full analytics</h2>
       <p style="color:#64748b;font-size:1.05rem;max-width:500px;margin:0 auto 20px">
         Upload CSV, Excel, JSON or Parquet via the sidebar.<br>
@@ -195,7 +195,7 @@ if df is None:
     </div>""", unsafe_allow_html=True)
     st.stop()
 
-# ── APPLY FILTERS ─────────────────────────────────────────────────────────────
+#  APPLY FILTERS 
 dff = df[
     df["zone"].isin(zones) & df["category"].isin(cats) &
     df["brand_type"].isin(brands) & df["sales_event"].isin(events)
@@ -211,7 +211,7 @@ if not gdp_df.empty:
 dff["usd_inr_rate"] = fx
 dff["revenue_usd"]  = (dff["revenue"] / fx).round(2)
 
-# ── DATASET KPIs ──────────────────────────────────────────────────────────────
+#  DATASET KPIs 
 rev_cr = dff["revenue"].sum() / 1e7
 k1,k2,k3,k4,k5 = st.columns(5)
 k1.metric("Total Revenue",     f"Rs{rev_cr:.1f} Cr")
@@ -221,14 +221,14 @@ k4.metric("Avg Discount",      f"{dff['discount_percent'].mean():.1f}%")
 k5.metric("Avg Units / Order", f"{dff['units_sold'].mean():.1f}")
 st.caption(f"USD equivalent: **${dff['revenue_usd'].sum():,.0f}**  (@ Rs{fx:.2f}/USD)  |  {len(dff):,} of {len(df):,} orders shown")
 st.markdown("---")
-# ── TABS ──────────────────────────────────────────────────────────────────────
+#  TABS 
 tabs = st.tabs([
     "Executive Summary", "Price Optimizer", "At-Risk Customers", "Model Drift",
     "Revenue Trends", "Categories", "Regional",
     "Inventory", "CLV", "Anomalies", "Cohort", "Pareto",
 ])
 
-# ── TAB 0: Executive Summary ──────────────────────────────────────────────────
+#  TAB 0: Executive Summary 
 with tabs[0]:
     summary = executive_summary(dff, fx)
     recs    = generate_recommendations(dff)
@@ -271,10 +271,10 @@ with tabs[0]:
         st.markdown(f"""<div class="card" style="border-left:4px solid {border}">
             <strong>{rec['priority']} &nbsp;|&nbsp; {rec['category']}</strong><br>
             <span style="font-size:.95rem">{rec['action']}</span><br>
-            <small style="color:#64748b">Impact: {rec['impact']} &nbsp;·&nbsp; Effort: {rec['effort']} &nbsp;·&nbsp; Metric: {rec['metric']}</small>
+            <small style="color:#64748b">Impact: {rec['impact']} &nbsp;&nbsp; Effort: {rec['effort']} &nbsp;&nbsp; Metric: {rec['metric']}</small>
         </div>""", unsafe_allow_html=True)
 
-# ── TAB 1: Price Optimizer ────────────────────────────────────────────────────
+#  TAB 1: Price Optimizer 
 with tabs[1]:
     st.subheader("Dynamic Price Optimizer")
     st.caption("Computes revenue-maximising discount per category using price elasticity (Lerner index).")
@@ -287,7 +287,7 @@ with tabs[1]:
         if total_impact > 0:
             st.success(f"Applying all recommendations could improve revenue by **{total_impact:+.1f}%**")
         elif total_impact < 0:
-            st.warning(f"Current discounts are above optimal — reducing them could recover **{abs(total_impact):.1f}%** revenue")
+            st.warning(f"Current discounts are above optimal  reducing them could recover **{abs(total_impact):.1f}%** revenue")
         show = ["category","current_discount","optimal_discount","change","direction","elasticity","revenue_impact_pct","rationale"]
         show = [c for c in show if c in price_recs.columns]
         st.dataframe(price_recs[show], use_container_width=True, hide_index=True)
@@ -297,7 +297,7 @@ with tabs[1]:
     else:
         st.warning("Not enough data to compute elasticity. Upload a larger dataset (500+ rows recommended).")
 
-# ── TAB 2: At-Risk Customers ──────────────────────────────────────────────────
+#  TAB 2: At-Risk Customers 
 with tabs[2]:
     st.subheader("At-Risk Customer Automation")
     st.caption("Churn risk scoring using recency, frequency, and monetary signals. Identifies high-value customers at risk of churning.")
@@ -321,7 +321,7 @@ with tabs[2]:
     else:
         st.warning("Not enough customer data for churn scoring.")
 
-# ── TAB 3: Model Drift ────────────────────────────────────────────────────────
+#  TAB 3: Model Drift 
 with tabs[3]:
     st.subheader("Model Drift Monitoring")
     st.caption("Detects feature distribution shift (PSI) and prediction performance degradation between reference and current windows.")
@@ -336,7 +336,7 @@ with tabs[3]:
         if fig_d: st.plotly_chart(fig_d, use_container_width=True)
         drifted = drift_df[drift_df["drift_detected"]]
         if not drifted.empty:
-            st.warning(f"{len(drifted)} features show significant drift — model retraining recommended.")
+            st.warning(f"{len(drifted)} features show significant drift  model retraining recommended.")
         else:
             st.success("No significant feature drift detected in current window.")
         st.dataframe(drift_df, use_container_width=True, hide_index=True)
@@ -354,7 +354,7 @@ with tabs[3]:
     elif drift_df.empty:
         st.info("Not enough data for drift analysis. Need at least 9 months of data.")
 
-# ── TAB 4: Revenue Trends ─────────────────────────────────────────────────────
+#  TAB 4: Revenue Trends 
 with tabs[4]:
     st.subheader("Revenue Trends")
     m = dff.groupby("year_month")["revenue"].sum().reset_index()
@@ -375,7 +375,7 @@ with tabs[4]:
         x="year_month",y="revenue",color="brand_type",markers=True,title="Revenue: Mass vs Premium",
         template="plotly_white"),use_container_width=True)
 
-# ── TAB 5: Categories ─────────────────────────────────────────────────────────
+#  TAB 5: Categories 
 with tabs[5]:
     st.subheader("Category & Brand Analysis")
     c1,c2 = st.columns(2)
@@ -393,7 +393,7 @@ with tabs[5]:
         x="year_month",y="revenue",color="sales_event",title="Festival vs Normal Revenue",
         template="plotly_white",barmode="group"),use_container_width=True)
 
-# ── TAB 6: Regional ───────────────────────────────────────────────────────────
+#  TAB 6: Regional 
 with tabs[6]:
     st.subheader("Regional Analysis")
     st.plotly_chart(px.bar(dff.groupby("state")["revenue"].sum().nlargest(15).reset_index(),
@@ -407,13 +407,13 @@ with tabs[6]:
         x="zone",y="units_sold",color="zone",title="Avg Units by Zone",
         template="plotly_white"),use_container_width=True)
 
-# ── TAB 7: Inventory ──────────────────────────────────────────────────────────
+#  TAB 7: Inventory 
 with tabs[7]:
     st.subheader("Inventory Alert System")
     from modules.inventory_alerts import compute_alerts
     alerts = compute_alerts(dff)
-    cmap = {"🔴 CRITICAL – Reorder Now":"#ef4444","🟠 HIGH – Monitor Closely":"#f97316",
-            "🟡 CLEARANCE – Excess Stock":"#eab308","🔵 SLOW MOVER – Review Listing":"#3b82f6","🟢 HEALTHY":"#22c55e"}
+    cmap = {" CRITICAL  Reorder Now":"#ef4444"," HIGH  Monitor Closely":"#f97316",
+            " CLEARANCE  Excess Stock":"#eab308"," SLOW MOVER  Review Listing":"#3b82f6"," HEALTHY":"#22c55e"}
     st.plotly_chart(px.scatter(alerts,x="avg_discount",y="avg_units_sold",color="alert_level",
         size="high_pressure_pct",hover_data=["category","zone","recommendation"],
         color_discrete_map=cmap,title="Inventory Alert Dashboard",template="plotly_white"),use_container_width=True)
@@ -422,7 +422,7 @@ with tabs[7]:
         [["category","zone","avg_units_sold","avg_discount","alert_level","recommendation"]],
         use_container_width=True,hide_index=True)
 
-# ── TAB 8: CLV ────────────────────────────────────────────────────────────────
+#  TAB 8: CLV 
 with tabs[8]:
     st.subheader("Customer Lifetime Value")
     from modules.clv import compute_clv
@@ -439,7 +439,7 @@ with tabs[8]:
     st.dataframe(clv_df.groupby("clv_tier")["clv"].agg(count="count",mean_clv="mean",total_clv="sum").round(2),
         use_container_width=True)
 
-# ── TAB 9: Anomalies ──────────────────────────────────────────────────────────
+#  TAB 9: Anomalies 
 with tabs[9]:
     st.subheader("Anomaly Detection")
     from modules.anomaly import anomaly_report
@@ -461,7 +461,7 @@ with tabs[9]:
         x="category",y="count",color="category",title="Anomalies by Category",template="plotly_white"),
         use_container_width=True)
 
-# ── TAB 10: Cohort ────────────────────────────────────────────────────────────
+#  TAB 10: Cohort 
 with tabs[10]:
     st.subheader("Cohort Analysis")
     from modules.cohort import build_cohort_table
@@ -477,7 +477,7 @@ with tabs[10]:
         labels={"x":"Months since first purchase","y":"Cohort","color":"Retention %"},
         text_auto=".0f",template="plotly_white"),use_container_width=True)
 
-# ── TAB 11: Pareto ────────────────────────────────────────────────────────────
+#  TAB 11: Pareto 
 with tabs[11]:
     st.subheader("Pareto & Concentration")
     agg = dff.groupby("category")["revenue"].sum().sort_values(ascending=False).reset_index()
@@ -509,7 +509,7 @@ with tabs[11]:
         template="plotly_white")
     st.plotly_chart(fig2,use_container_width=True)
 
-# ── FOOTER ────────────────────────────────────────────────────────────────────
+#  FOOTER 
 st.markdown("---")
 st.caption(
     f"{cfg.APP_NAME} v{cfg.APP_VERSION}  |  "

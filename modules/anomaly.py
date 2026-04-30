@@ -1,12 +1,12 @@
 """
 modules/anomaly.py
-──────────────────────────────────────────────────────────────────────────────
+
 Automated Anomaly Detection
-  • Isolation Forest  (global outliers)
-  • Z-score / IQR     (univariate, per column)
-  • DBSCAN            (density-based spatial outliers)
-  • Interactive Plotly scatter + heatmap of anomaly scores
-  • Exportable anomaly report DataFrame
+   Isolation Forest  (global outliers)
+   Z-score / IQR     (univariate, per column)
+   DBSCAN            (density-based spatial outliers)
+   Interactive Plotly scatter + heatmap of anomaly scores
+   Exportable anomaly report DataFrame
 """
 import numpy as np
 import pandas as pd
@@ -17,7 +17,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import DBSCAN
 
 
-# ── feature prep ─────────────────────────────────────────────────────────────
+#  feature prep 
 
 _COLS = ["customer_age", "log_base_price", "discount_percent",
          "log_final_price", "log_units_sold", "log_revenue"]
@@ -28,7 +28,7 @@ def _prepare(df: pd.DataFrame) -> np.ndarray:
     return RobustScaler().fit_transform(X)
 
 
-# ── Isolation Forest ──────────────────────────────────────────────────────────
+#  Isolation Forest 
 
 def detect_isolation_forest(
     df: pd.DataFrame,
@@ -38,8 +38,8 @@ def detect_isolation_forest(
     Detect anomalies using Isolation Forest.
 
     Returns df with added columns:
-        iso_score   – raw anomaly score (lower = more anomalous)
-        is_anomaly  – boolean flag
+        iso_score    raw anomaly score (lower = more anomalous)
+        is_anomaly   boolean flag
     """
     X = _prepare(df)
     iso = IsolationForest(n_estimators=150, contamination=contamination,
@@ -50,7 +50,7 @@ def detect_isolation_forest(
     return df
 
 
-# ── Z-score univariate ────────────────────────────────────────────────────────
+#  Z-score univariate 
 
 def detect_zscore(
     df: pd.DataFrame,
@@ -67,7 +67,7 @@ def detect_zscore(
     return df
 
 
-# ── DBSCAN ────────────────────────────────────────────────────────────────────
+#  DBSCAN 
 
 def detect_dbscan(
     df: pd.DataFrame,
@@ -82,12 +82,12 @@ def detect_dbscan(
     return df
 
 
-# ── combined report ───────────────────────────────────────────────────────────
+#  combined report 
 
 def anomaly_report(df: pd.DataFrame) -> pd.DataFrame:
     """
     Run all detectors and return a combined anomaly report.
-    A row is flagged if ≥ 2 detectors agree.
+    A row is flagged if  2 detectors agree.
     """
     df = detect_isolation_forest(df)
     df = detect_zscore(df)
@@ -102,7 +102,7 @@ def anomaly_report(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── plots ─────────────────────────────────────────────────────────────────────
+#  plots 
 
 def plot_anomalies(df: pd.DataFrame) -> None:
     df = anomaly_report(df)
@@ -113,7 +113,7 @@ def plot_anomalies(df: pd.DataFrame) -> None:
         color="confirmed_anomaly",
         color_discrete_map={True: "red", False: "steelblue"},
         opacity=0.6, size_max=8,
-        title="Anomaly Detection – log(Units) vs log(Revenue)",
+        title="Anomaly Detection  log(Units) vs log(Revenue)",
         labels={"log_units_sold": "log(Units Sold)", "log_revenue": "log(Revenue)",
                 "confirmed_anomaly": "Anomaly"},
         template="plotly_white",
@@ -127,7 +127,7 @@ def plot_anomalies(df: pd.DataFrame) -> None:
         color="confirmed_anomaly",
         color_discrete_map={True: "red", False: "lightgray"},
         opacity=0.55,
-        title="Anomaly Detection – Discount % vs log(Final Price)",
+        title="Anomaly Detection  Discount % vs log(Final Price)",
         labels={"discount_percent": "Discount %", "log_final_price": "log(Final Price)",
                 "confirmed_anomaly": "Anomaly"},
         template="plotly_white",
@@ -150,8 +150,8 @@ def plot_anomalies(df: pd.DataFrame) -> None:
     fig.show()
 
     n = df["confirmed_anomaly"].sum()
-    print(f"\n✅ Anomaly detection complete.")
-    print(f"   Confirmed anomalies (≥2 detectors): {n:,} ({n/len(df):.2%} of orders)")
+    print(f"\n Anomaly detection complete.")
+    print(f"   Confirmed anomalies (2 detectors): {n:,} ({n/len(df):.2%} of orders)")
     return df
 
 

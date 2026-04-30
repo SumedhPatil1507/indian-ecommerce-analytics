@@ -13,7 +13,7 @@ from plotly.subplots import make_subplots
 warnings.filterwarnings("ignore")
 
 
-# ── Monthly aggregation helper ────────────────────────────────────────────────
+#  Monthly aggregation helper 
 
 def _monthly(df: pd.DataFrame, col: str = "revenue", agg: str = "sum") -> pd.Series:
     s = df.groupby(df["order_date"].dt.to_period("M"))[col].agg(agg)
@@ -21,7 +21,7 @@ def _monthly(df: pd.DataFrame, col: str = "revenue", agg: str = "sum") -> pd.Ser
     return s.asfreq("MS").interpolate("linear")
 
 
-# ── Line plots ────────────────────────────────────────────────────────────────
+#  Line plots 
 
 def plot_trends(df: pd.DataFrame) -> None:
     monthly_rev  = _monthly(df, "revenue", "sum").reset_index()
@@ -29,7 +29,7 @@ def plot_trends(df: pd.DataFrame) -> None:
 
     fig = px.line(monthly_rev, x="date", y="revenue", markers=True,
                   title="Total Monthly Revenue Trend (36 months)",
-                  labels={"revenue": "Total Revenue (₹)", "date": "Month"},
+                  labels={"revenue": "Total Revenue ()", "date": "Month"},
                   template="plotly_white")
     fig.show()
 
@@ -38,7 +38,7 @@ def plot_trends(df: pd.DataFrame) -> None:
     aov.columns = ["date", "aov"]
     fig = px.line(aov, x="date", y="aov", markers=True,
                   title="Average Order Value (AOV) Trend",
-                  labels={"aov": "Avg Revenue per Order (₹)", "date": "Month"},
+                  labels={"aov": "Avg Revenue per Order ()", "date": "Month"},
                   template="plotly_white")
     fig.show()
 
@@ -70,7 +70,7 @@ def plot_trends(df: pd.DataFrame) -> None:
     zone_m["date"] = zone_m["order_date"].dt.to_timestamp()
     fig = px.line(zone_m, x="date", y="revenue", color="zone", markers=True,
                   title="Monthly Revenue by Zone",
-                  labels={"revenue": "Revenue (₹)", "date": "Month"},
+                  labels={"revenue": "Revenue ()", "date": "Month"},
                   template="plotly_white")
     fig.show()
 
@@ -82,12 +82,12 @@ def plot_trends(df: pd.DataFrame) -> None:
     brand_m["date"] = brand_m["order_date"].dt.to_timestamp()
     fig = px.line(brand_m, x="date", y="revenue", color="brand_type", markers=True,
                   title="Revenue Trend: Mass vs Premium Brands",
-                  labels={"revenue": "Revenue (₹)", "date": "Month"},
+                  labels={"revenue": "Revenue ()", "date": "Month"},
                   template="plotly_white")
     fig.show()
 
 
-# ── Seasonal decomposition ────────────────────────────────────────────────────
+#  Seasonal decomposition 
 
 def plot_decomposition(df: pd.DataFrame) -> None:
     from statsmodels.tsa.seasonal import seasonal_decompose
@@ -104,13 +104,13 @@ def plot_decomposition(df: pd.DataFrame) -> None:
         fig.add_trace(go.Scatter(x=comp.index, y=comp.values, name=name), row=i, col=1)
 
     fig.update_layout(
-        title="Monthly Revenue – Additive Decomposition",
+        title="Monthly Revenue  Additive Decomposition",
         height=800, template="plotly_white", showlegend=False,
     )
     fig.show()
 
 
-# ── Prophet forecast ──────────────────────────────────────────────────────────
+#  Prophet forecast 
 
 def forecast_prophet(df: pd.DataFrame, periods: int = 60) -> pd.DataFrame:
     """
@@ -150,15 +150,15 @@ def forecast_prophet(df: pd.DataFrame, periods: int = 60) -> pd.DataFrame:
     ))
     fig.add_vline(x=monthly["ds"].max(), line_dash="dash", line_color="gray")
     fig.update_layout(
-        title="Revenue Forecast – Prophet (next 5 years)",
-        xaxis_title="Date", yaxis_title="Monthly Revenue (₹)",
+        title="Revenue Forecast  Prophet (next 5 years)",
+        xaxis_title="Date", yaxis_title="Monthly Revenue ()",
         template="plotly_white",
     )
     fig.show()
     return forecast
 
 
-# ── SARIMA forecast ───────────────────────────────────────────────────────────
+#  SARIMA forecast 
 
 def forecast_sarima(df: pd.DataFrame, periods: int = 60) -> pd.Series:
     """
@@ -195,8 +195,8 @@ def forecast_sarima(df: pd.DataFrame, periods: int = 60) -> pd.Series:
         line=dict(color="rgba(255,255,255,0)"), name="80% CI",
     ))
     fig.update_layout(
-        title="Revenue Forecast – SARIMA(1,1,1)(1,1,1)[12]",
-        xaxis_title="Date", yaxis_title="Monthly Revenue (₹)",
+        title="Revenue Forecast  SARIMA(1,1,1)(1,1,1)[12]",
+        xaxis_title="Date", yaxis_title="Monthly Revenue ()",
         template="plotly_white",
     )
     fig.show()

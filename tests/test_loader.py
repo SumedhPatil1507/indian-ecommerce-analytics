@@ -1,4 +1,4 @@
-"""tests/test_loader.py – unit tests for data loading & live data stubs."""
+"""tests/test_loader.py  unit tests for data loading & live data stubs."""
 import os
 import pandas as pd
 import pytest

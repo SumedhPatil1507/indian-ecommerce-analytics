@@ -1,12 +1,12 @@
-﻿CUSTOM_CSS = '''<style>
-/* ── Global ── */
+CUSTOM_CSS = '''<style>
+/*  Global  */
 [data-testid="stAppViewContainer"] { background: #f8f9fc; }
 [data-testid="stSidebar"] { background: #1a1f36; }
 [data-testid="stSidebar"] * { color: #e2e8f0 !important; }
 [data-testid="stSidebar"] .stRadio label { color: #e2e8f0 !important; }
 [data-testid="stSidebar"] hr { border-color: #2d3561 !important; }
 
-/* ── Metric cards ── */
+/*  Metric cards  */
 [data-testid="metric-container"] {
     background: #ffffff;
     border: 1px solid #e8ecf4;
@@ -15,7 +15,7 @@
     box-shadow: 0 2px 8px rgba(0,0,0,0.05);
 }
 
-/* ── Tabs ── */
+/*  Tabs  */
 .stTabs [data-baseweb="tab-list"] {
     background: #ffffff;
     border-radius: 10px;
@@ -32,7 +32,7 @@
     color: white !important;
 }
 
-/* ── Buttons ── */
+/*  Buttons  */
 .stButton > button[kind="primary"] {
     background: #4f46e5;
     border: none;
@@ -41,7 +41,7 @@
 }
 .stButton > button[kind="primary"]:hover { background: #4338ca; }
 
-/* ── Insight cards ── */
+/*  Insight cards  */
 .insight-card {
     background: #ffffff;
     border-left: 4px solid #4f46e5;
@@ -74,7 +74,7 @@
     box-shadow: 0 1px 4px rgba(0,0,0,0.05);
 }
 
-/* ── Page title ── */
+/*  Page title  */
 .page-title {
     font-size: 1.8rem;
     font-weight: 700;

@@ -1,11 +1,11 @@
 """
 modules/inventory_alerts.py
-──────────────────────────────────────────────────────────────────────────────
+
 Dynamic Inventory Alert System
-  • Detects high-velocity SKU groups (category × zone) approaching stock-out
-  • Flags slow-movers with high inventory pressure
-  • Generates a colour-coded alert dashboard (Plotly)
-  • Outputs a prioritised reorder recommendation table
+   Detects high-velocity SKU groups (category  zone) approaching stock-out
+   Flags slow-movers with high inventory pressure
+   Generates a colour-coded alert dashboard (Plotly)
+   Outputs a prioritised reorder recommendation table
 """
 import numpy as np
 import pandas as pd
@@ -14,17 +14,17 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 
-# ── alert thresholds (tunable) ────────────────────────────────────────────────
+#  alert thresholds (tunable) 
 VELOCITY_HIGH_PCTILE  = 0.80   # top 20% units/day = high velocity
 DISCOUNT_SPIKE_THRESH = 45.0   # avg discount > 45% = clearance signal
 LOW_STOCK_PRESSURE    = "High" # inventory_pressure value meaning low stock
 
 
-# ── core alert computation ────────────────────────────────────────────────────
+#  core alert computation 
 
 def compute_alerts(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Compute per-group (category × zone) inventory health metrics and alerts.
+    Compute per-group (category  zone) inventory health metrics and alerts.
 
     Returns
     -------
@@ -53,33 +53,33 @@ def compute_alerts(df: pd.DataFrame) -> pd.DataFrame:
     # alert logic
     def _alert(row):
         if row["avg_units_sold"] >= vel_thresh and row["high_pressure_pct"] >= 60:
-            return "🔴 CRITICAL – Reorder Now"
+            return " CRITICAL  Reorder Now"
         if row["avg_units_sold"] >= vel_thresh and row["high_pressure_pct"] >= 30:
-            return "🟠 HIGH – Monitor Closely"
+            return " HIGH  Monitor Closely"
         if row["avg_discount"] >= DISCOUNT_SPIKE_THRESH and row["high_pressure_pct"] >= 50:
-            return "🟡 CLEARANCE – Excess Stock"
+            return " CLEARANCE  Excess Stock"
         if row["avg_units_sold"] < grp["avg_units_sold"].quantile(0.20):
-            return "🔵 SLOW MOVER – Review Listing"
-        return "🟢 HEALTHY"
+            return " SLOW MOVER  Review Listing"
+        return " HEALTHY"
 
     grp["alert_level"] = grp.apply(_alert, axis=1)
 
     def _rec(row):
         lvl = row["alert_level"]
         if "CRITICAL"  in lvl: return f"Reorder {row['category']} in {row['zone']} immediately"
-        if "HIGH"      in lvl: return f"Increase safety stock for {row['category']} – {row['zone']}"
-        if "CLEARANCE" in lvl: return f"Run targeted promotion to clear {row['category']} – {row['zone']}"
-        if "SLOW"      in lvl: return f"Review pricing / listing quality for {row['category']} – {row['zone']}"
+        if "HIGH"      in lvl: return f"Increase safety stock for {row['category']}  {row['zone']}"
+        if "CLEARANCE" in lvl: return f"Run targeted promotion to clear {row['category']}  {row['zone']}"
+        if "SLOW"      in lvl: return f"Review pricing / listing quality for {row['category']}  {row['zone']}"
         return "No action required"
 
     grp["recommendation"] = grp.apply(_rec, axis=1)
     return grp.sort_values(["alert_level", "velocity_score"], ascending=[True, False])
 
 
-# ── plots ─────────────────────────────────────────────────────────────────────
+#  plots 
 
 def plot_inventory_heatmap(df: pd.DataFrame) -> None:
-    """Heatmap: avg units sold per category × zone."""
+    """Heatmap: avg units sold per category  zone."""
     pivot = (
         df.groupby(["category", "zone"])["units_sold"]
         .mean()
@@ -89,7 +89,7 @@ def plot_inventory_heatmap(df: pd.DataFrame) -> None:
     fig = px.imshow(
         pivot,
         color_continuous_scale="YlOrRd",
-        title="Avg Units Sold – Category × Zone (Inventory Velocity)",
+        title="Avg Units Sold  Category  Zone (Inventory Velocity)",
         labels={"color": "Avg Units Sold"},
         text_auto=True,
         template="plotly_white",
@@ -102,11 +102,11 @@ def plot_alert_dashboard(df: pd.DataFrame) -> None:
 
     # colour map
     colour_map = {
-        "🔴 CRITICAL – Reorder Now":    "red",
-        "🟠 HIGH – Monitor Closely":    "orange",
-        "🟡 CLEARANCE – Excess Stock":  "gold",
-        "🔵 SLOW MOVER – Review Listing":"steelblue",
-        "🟢 HEALTHY":                   "green",
+        " CRITICAL  Reorder Now":    "red",
+        " HIGH  Monitor Closely":    "orange",
+        " CLEARANCE  Excess Stock":  "gold",
+        " SLOW MOVER  Review Listing":"steelblue",
+        " HEALTHY":                   "green",
     }
 
     fig = px.scatter(
@@ -117,7 +117,7 @@ def plot_alert_dashboard(df: pd.DataFrame) -> None:
         size="high_pressure_pct",
         hover_data=["category", "zone", "recommendation"],
         color_discrete_map=colour_map,
-        title="Inventory Alert Dashboard – Discount vs Velocity",
+        title="Inventory Alert Dashboard  Discount vs Velocity",
         labels={
             "avg_discount":   "Avg Discount %",
             "avg_units_sold": "Avg Units Sold",
@@ -129,7 +129,7 @@ def plot_alert_dashboard(df: pd.DataFrame) -> None:
                   annotation_text="Clearance threshold")
     fig.show()
 
-    # bar chart – top 15 critical groups
+    # bar chart  top 15 critical groups
     top = alerts[alerts["alert_level"].str.contains("CRITICAL|HIGH")].head(15)
     if not top.empty:
         top["group"] = top["category"] + " / " + top["zone"]
@@ -137,14 +137,14 @@ def plot_alert_dashboard(df: pd.DataFrame) -> None:
             top, x="velocity_score", y="group", orientation="h",
             color="alert_level", color_discrete_map=colour_map,
             title="Top Critical / High-Alert Inventory Groups",
-            labels={"velocity_score": "Velocity Score (0–100)", "group": "Category / Zone"},
+            labels={"velocity_score": "Velocity Score (0100)", "group": "Category / Zone"},
             template="plotly_white",
         )
         fig2.show()
 
 
 def run_inventory_alerts(df: pd.DataFrame) -> None:
-    """Entry point – print alert table and show plots."""
+    """Entry point  print alert table and show plots."""
     print("=" * 70)
     print("  DYNAMIC INVENTORY ALERT SYSTEM")
     print("=" * 70)
@@ -152,7 +152,7 @@ def run_inventory_alerts(df: pd.DataFrame) -> None:
     alerts = compute_alerts(df)
     critical = alerts[alerts["alert_level"].str.contains("CRITICAL|HIGH")]
 
-    print(f"\n⚠  {len(critical)} groups require immediate attention:\n")
+    print(f"\n  {len(critical)} groups require immediate attention:\n")
     print(critical[["category", "zone", "avg_units_sold", "avg_discount",
                      "high_pressure_pct", "alert_level", "recommendation"]]
           .to_string(index=False))
@@ -160,6 +160,6 @@ def run_inventory_alerts(df: pd.DataFrame) -> None:
     plot_inventory_heatmap(df)
     plot_alert_dashboard(df)
 
-    print("\n✅ Full alert table:")
+    print("\n Full alert table:")
     print(alerts[["category", "zone", "alert_level", "recommendation"]]
           .to_string(index=False))

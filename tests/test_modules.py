@@ -1,4 +1,4 @@
-"""tests/test_modules.py – smoke tests for analytics modules."""
+"""tests/test_modules.py  smoke tests for analytics modules."""
 import os
 import pytest
 import pandas as pd

@@ -1,6 +1,6 @@
-﻿"""
+"""
 modules/model_drift.py
-MLOps & Model Integrity — Model Drift Monitoring.
+MLOps & Model Integrity  Model Drift Monitoring.
 Detects data drift (feature distribution shift) and prediction drift
 between a reference window and the current window.
 Persists drift reports to Supabase.
@@ -21,7 +21,7 @@ _DRIFT_THRESHOLD_KS   = 0.05  # KS p-value < 0.05 = significant drift
 
 
 def _psi(expected: np.ndarray, actual: np.ndarray, buckets: int = 10) -> float:
-    """Population Stability Index — standard drift metric."""
+    """Population Stability Index  standard drift metric."""
     breakpoints = np.percentile(expected, np.linspace(0, 100, buckets + 1))
     breakpoints[0]  = -np.inf
     breakpoints[-1] =  np.inf
@@ -186,7 +186,7 @@ def plot_drift(drift_df: pd.DataFrame):
     fig.add_hline(y=_DRIFT_THRESHOLD_PSI, line_dash="dash", line_color="#ef4444",
                   annotation_text=f"Drift threshold (PSI={_DRIFT_THRESHOLD_PSI})")
     fig.update_layout(
-        title="Feature Drift — Population Stability Index (PSI)",
+        title="Feature Drift  Population Stability Index (PSI)",
         xaxis_title="Feature",
         yaxis_title="PSI Score",
         template="plotly_white",

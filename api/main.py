@@ -1,22 +1,22 @@
 """
 api/main.py
-──────────────────────────────────────────────────────────────────────────────
-FastAPI wrapper – exposes key analytics as REST endpoints.
+
+FastAPI wrapper  exposes key analytics as REST endpoints.
 
 Run locally:
     uvicorn api.main:app --reload --port 8000
 
 Endpoints
-─────────
-GET  /health                  – liveness check
-GET  /live/macro              – World Bank GDP + CPI (live)
-GET  /live/fx                 – USD/INR rate (live)
-GET  /live/trends             – Google Trends interest (live)
-GET  /analytics/revenue       – monthly revenue summary
-GET  /analytics/elasticity    – price elasticity by category
-GET  /analytics/alerts        – inventory alert table
-GET  /analytics/clv           – CLV tier summary
-POST /predict/revenue         – predict revenue for a single order
+
+GET  /health                   liveness check
+GET  /live/macro               World Bank GDP + CPI (live)
+GET  /live/fx                  USD/INR rate (live)
+GET  /live/trends              Google Trends interest (live)
+GET  /analytics/revenue        monthly revenue summary
+GET  /analytics/elasticity     price elasticity by category
+GET  /analytics/alerts         inventory alert table
+GET  /analytics/clv            CLV tier summary
+POST /predict/revenue          predict revenue for a single order
 """
 import os
 from functools import lru_cache
@@ -28,7 +28,7 @@ from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-# ── app ───────────────────────────────────────────────────────────────────────
+#  app 
 app = FastAPI(
     title="Indian E-Commerce Analytics API",
     description=(
@@ -49,7 +49,7 @@ app.add_middleware(
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
-# ── lazy data loading ─────────────────────────────────────────────────────────
+#  lazy data loading 
 
 DATA_PATH = os.getenv(
     "DATA_PATH",
@@ -70,14 +70,14 @@ def _get_model():
     return train_all(_get_df())
 
 
-# ── health ────────────────────────────────────────────────────────────────────
+#  health 
 
 @app.get("/health", tags=["System"])
 def health():
     return {"status": "ok", "rows": len(_get_df())}
 
 
-# ── live data endpoints ───────────────────────────────────────────────────────
+#  live data endpoints 
 
 @app.get("/live/macro", tags=["Live Data"],
          summary="India GDP growth & CPI inflation (World Bank)")
@@ -95,24 +95,24 @@ def live_macro():
     return {
         "gdp_growth": gdp.tail(3).to_dict(orient="records"),
         "cpi_inflation": cpi.tail(3).to_dict(orient="records"),
-        "source": "World Bank Open Data – https://data.worldbank.org/",
+        "source": "World Bank Open Data  https://data.worldbank.org/",
         "license": "CC BY 4.0",
     }
 
 
 @app.get("/live/fx", tags=["Live Data"],
-         summary="Live USD → INR exchange rate")
+         summary="Live USD  INR exchange rate")
 def live_fx():
     """
-    Returns the current USD → INR exchange rate.
+    Returns the current USD  INR exchange rate.
 
-    **Source:** exchangerate.host – https://exchangerate.host (free tier)
+    **Source:** exchangerate.host  https://exchangerate.host (free tier)
     """
     from data.loader import fetch_usd_inr
     rate = fetch_usd_inr()
     return {
         "usd_inr": rate,
-        "source": "exchangerate.host – https://exchangerate.host",
+        "source": "exchangerate.host  https://exchangerate.host",
     }
 
 
@@ -122,7 +122,7 @@ def live_trends(
     timeframe: str = Query("today 3-m", description="pytrends timeframe string"),
 ):
     """
-    Returns Google Trends relative search interest (0–100) for key Indian
+    Returns Google Trends relative search interest (0100) for key Indian
     e-commerce keywords.
 
     **Source:** Google Trends via pytrends (GeneralMills, 2023).
@@ -131,16 +131,16 @@ def live_trends(
     from data.loader import fetch_google_trends
     trends = fetch_google_trends(timeframe=timeframe)
     if trends.empty:
-        raise HTTPException(503, "Google Trends unavailable – pytrends may be rate-limited.")
+        raise HTTPException(503, "Google Trends unavailable  pytrends may be rate-limited.")
     latest = trends.tail(1).reset_index().to_dict(orient="records")
     return {
         "latest": latest,
-        "source": "Google Trends via pytrends – https://github.com/GeneralMills/pytrends",
+        "source": "Google Trends via pytrends  https://github.com/GeneralMills/pytrends",
         "license": "Apache 2.0",
     }
 
 
-# ── analytics endpoints ───────────────────────────────────────────────────────
+#  analytics endpoints 
 
 @app.get("/analytics/revenue", tags=["Analytics"],
          summary="Monthly revenue summary")
@@ -186,7 +186,7 @@ def analytics_clv():
     return summary.to_dict(orient="records")
 
 
-# ── prediction endpoint ───────────────────────────────────────────────────────
+#  prediction endpoint 
 
 class OrderInput(BaseModel):
     state:                str   = Field(..., example="Maharashtra")

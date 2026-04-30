@@ -1,10 +1,10 @@
 """
 modules/cohort.py
-──────────────────────────────────────────────────────────────────────────────
+
 Cohort Analysis Heatmap
-  • Groups customers by first-purchase month (cohort)
-  • Tracks retention & revenue over subsequent months
-  • Interactive Plotly heatmap showing cohort retention rates
+   Groups customers by first-purchase month (cohort)
+   Tracks retention & revenue over subsequent months
+   Interactive Plotly heatmap showing cohort retention rates
 """
 import numpy as np
 import pandas as pd
@@ -22,7 +22,7 @@ def build_cohort_table(df: pd.DataFrame, metric: str = "revenue") -> pd.DataFram
 
     Returns
     -------
-    pd.DataFrame pivot: cohort_month × cohort_period
+    pd.DataFrame pivot: cohort_month  cohort_period
     """
     # synthetic customer_id if missing
     if "customer_id" not in df.columns:
@@ -80,12 +80,12 @@ def plot_cohort_heatmap(df: pd.DataFrame, metric: str = "revenue") -> None:
     # retention rate (normalise by cohort size at period 0)
     if metric == "count":
         retention = pivot.div(pivot[0], axis=0) * 100
-        title = "Cohort Retention Rate (%) – Order Count"
+        title = "Cohort Retention Rate (%)  Order Count"
         fmt = ".1f"
         cmap = "Blues"
     else:
         retention = pivot.div(pivot[0], axis=0) * 100
-        title = "Cohort Revenue Retention (%) – Normalised by Month 0"
+        title = "Cohort Revenue Retention (%)  Normalised by Month 0"
         fmt = ".0f"
         cmap = "Greens"
 

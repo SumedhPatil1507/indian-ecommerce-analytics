@@ -1,4 +1,4 @@
-﻿"""
+"""
 data/loader.py
 Centralised data loading, cleaning, feature engineering, and live data enrichment.
 
@@ -62,7 +62,7 @@ _TREND_KEYWORDS = [
 ]
 
 
-# ── Public API ────────────────────────────────────────────────────────────────
+#  Public API 
 
 def load(path: str, enrich_live: bool = True) -> pd.DataFrame:
     """Load CSV, clean, engineer features, optionally enrich with live macro."""
@@ -108,7 +108,7 @@ def load_any(file_obj, filename: str) -> pd.DataFrame:
     return _engineer(_clean(df))
 
 
-# ── Cleaning ──────────────────────────────────────────────────────────────────
+#  Cleaning 
 
 def _clean(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -119,7 +119,7 @@ def _clean(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── Feature engineering ───────────────────────────────────────────────────────
+#  Feature engineering 
 
 def _engineer(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -138,7 +138,7 @@ def _engineer(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── World Bank ────────────────────────────────────────────────────────────────
+#  World Bank 
 
 def fetch_worldbank(indicator: str, country: str = _WB_COUNTRY) -> pd.DataFrame:
     """
@@ -175,7 +175,7 @@ def _enrich_worldbank(df: pd.DataFrame) -> pd.DataFrame:
     return df.merge(macro, on="year", how="left")
 
 
-# ── FX rate ───────────────────────────────────────────────────────────────────
+#  FX rate 
 
 def fetch_usd_inr() -> float:
     """
@@ -203,7 +203,7 @@ def _enrich_fx(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-# ── Google Trends ─────────────────────────────────────────────────────────────
+#  Google Trends 
 
 def fetch_google_trends(
     keywords: list[str] = _TREND_KEYWORDS,

@@ -1,4 +1,4 @@
-﻿"""
+"""
 modules/export.py - PDF and Excel export for client deliverables.
 """
 from __future__ import annotations
@@ -107,7 +107,7 @@ def _build_pdf(summary: dict, recs: list[dict]) -> bytes:
         pdf.set_font("Helvetica", "", 9)
         pdf.cell(W - 60, 6, _safe(str(val))[:60], border="B", ln=True)
 
-    # ── Page 1 ────────────────────────────────────────────────────────────────
+    #  Page 1 
     h1("IndiaCommerce Analytics")
     pdf.set_font("Helvetica", "", 9)
     pdf.set_text_color(120, 120, 120)
@@ -136,7 +136,7 @@ def _build_pdf(summary: dict, recs: list[dict]) -> bytes:
     for o in summary.get("opportunities", []):
         body(f"- {o}")
 
-    # ── Page 2: Recommendations ───────────────────────────────────────────────
+    #  Page 2: Recommendations 
     pdf.add_page()
     h1("Prioritised Recommendations")
     pdf.ln(2)
@@ -156,7 +156,7 @@ def _build_pdf(summary: dict, recs: list[dict]) -> bytes:
 
 
 def _plain_text_pdf(summary: dict, recs: list[dict]) -> bytes:
-    """Plain-text fallback — always works, no dependencies."""
+    """Plain-text fallback  always works, no dependencies."""
     lines = [
         "INDIACOMMERCE ANALYTICS - EXECUTIVE REPORT",
         f"Generated: {datetime.now().strftime('%d %b %Y')}",

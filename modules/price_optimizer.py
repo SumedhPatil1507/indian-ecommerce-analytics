@@ -1,6 +1,6 @@
-﻿"""
+"""
 modules/price_optimizer.py
-Dynamic Pricing & Elasticity Engine — Price Optimizer
+Dynamic Pricing & Elasticity Engine  Price Optimizer
 Computes optimal discount per category/zone using elasticity + margin targets.
 Persists recommendations to Supabase.
 """
@@ -58,7 +58,7 @@ def optimal_discount(
         return {
             "optimal_discount": current_discount,
             "direction": "hold",
-            "rationale": "Giffen/luxury good — discounting may reduce demand",
+            "rationale": "Giffen/luxury good  discounting may reduce demand",
             "revenue_impact_pct": 0.0,
         }
     abs_e = abs(elasticity)
@@ -79,7 +79,7 @@ def optimal_discount(
         "optimal_discount": round(float(np.clip(optimal, 0, max_discount)), 1),
         "direction": direction,
         "rationale": (
-            f"Elasticity {elasticity:.2f} — "
+            f"Elasticity {elasticity:.2f}  "
             f"{'elastic: increase discount to grow volume' if abs_e > 1 else 'inelastic: reduce discount to protect margin'}"
         ),
         "revenue_impact_pct": round(float(rev_impact), 1),

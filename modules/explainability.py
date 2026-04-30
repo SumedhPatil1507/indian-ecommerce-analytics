@@ -20,7 +20,7 @@ def plot_permutation_importance(model, X_test, y_test, feature_names, top_n=15):
         error_x=dict(type="data", array=perm.importances_std[idx]),
         marker_color="steelblue",
     ))
-    fig.update_layout(title=f"Permutation Importance – Top {top_n}",
+    fig.update_layout(title=f"Permutation Importance  Top {top_n}",
                       xaxis_title="Mean increase in MSE",
                       template="plotly_white")
     fig.show()
@@ -62,6 +62,6 @@ def run_lime(model, X_train, X_test, y_test, feature_names, n_samples=3):
     idxs = [np.argmin(y_test.values), len(y_test)//2, np.argmax(y_test.values)]
     for i, idx in enumerate(idxs[:n_samples], 1):
         exp = explainer.explain_instance(X_test[idx], model.predict, num_features=10)
-        print(f"\nLIME – Sample {i}  (true revenue = ₹{y_test.iloc[idx]:,.0f})")
+        print(f"\nLIME  Sample {i}  (true revenue = {y_test.iloc[idx]:,.0f})")
         for feat, weight in exp.as_list():
             print(f"  {feat:<55} {weight:+.4f}")
