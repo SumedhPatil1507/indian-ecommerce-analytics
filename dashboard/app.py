@@ -32,25 +32,78 @@ st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
 
 st.markdown("""<style>
-[data-testid="stAppViewContainer"]{background:#f8f9fc}
+[data-testid="stAppViewContainer"]{background:#f1f5f9}
 [data-testid="stSidebar"]{background:#0f172a}
 [data-testid="stSidebar"] *{color:#e2e8f0!important}
 [data-testid="stSidebar"] .stMarkdown h3{color:#a5b4fc!important;font-size:1rem!important}
 [data-testid="stSidebar"] hr{border-color:#1e293b!important}
-[data-testid="metric-container"]{background:#fff;border:1px solid #e2e8f0;border-radius:12px;
-  padding:16px 20px;box-shadow:0 1px 6px rgba(0,0,0,.06)}
-[data-testid="metric-container"] [data-testid="stMetricValue"]{font-size:1.4rem;font-weight:700;color:#1e293b}
-.stTabs [data-baseweb="tab-list"]{background:#fff;border-radius:10px;padding:4px;border:1px solid #e2e8f0;gap:2px}
-.stTabs [data-baseweb="tab"]{border-radius:8px;font-weight:500;color:#64748b;padding:6px 14px}
+[data-testid="metric-container"]{background:#fff;border:1px solid #cbd5e1;border-radius:12px;
+  padding:16px 20px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+[data-testid="metric-container"] [data-testid="stMetricValue"]{font-size:1.4rem;font-weight:700;color:#0f172a}
+[data-testid="metric-container"] [data-testid="stMetricLabel"]{color:#475569;font-weight:600}
+.stTabs [data-baseweb="tab-list"]{background:#fff;border-radius:10px;padding:4px;border:1px solid #cbd5e1;gap:2px}
+.stTabs [data-baseweb="tab"]{border-radius:8px;font-weight:500;color:#475569;padding:6px 14px}
 .stTabs [aria-selected="true"]{background:#4f46e5!important;color:#fff!important}
 .stButton>button[kind="primary"]{background:#4f46e5;border:none;border-radius:8px;font-weight:600;padding:8px 20px}
 .stButton>button[kind="primary"]:hover{background:#4338ca}
-.card{background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:18px 22px;margin:8px 0;box-shadow:0 1px 4px rgba(0,0,0,.05)}
-.card-blue{border-left:4px solid #4f46e5}
-.card-red{border-left:4px solid #ef4444;background:#fff8f8}
-.card-green{border-left:4px solid #22c55e;background:#f0fdf4}
-.card-amber{border-left:4px solid #f59e0b;background:#fffbeb}
-.section-title{font-size:1.05rem;font-weight:700;color:#1e293b;margin:16px 0 8px}
+
+/* ---- Executive Summary cards ---- */
+.card{
+  background:#ffffff;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  padding:18px 22px;
+  margin:8px 0;
+  box-shadow:0 2px 6px rgba(0,0,0,.07);
+  color:#0f172a;
+  font-size:.95rem;
+  line-height:1.6;
+}
+.card-blue{
+  border-left:5px solid #4f46e5;
+  background:#eef2ff;
+  color:#1e1b4b;
+}
+.card-red{
+  border-left:5px solid #dc2626;
+  background:#fef2f2;
+  color:#7f1d1d;
+}
+.card-green{
+  border-left:5px solid #16a34a;
+  background:#f0fdf4;
+  color:#14532d;
+}
+.card-amber{
+  border-left:5px solid #d97706;
+  background:#fffbeb;
+  color:#78350f;
+}
+.card strong, .card b{color:inherit;font-weight:700}
+.rec-card{
+  background:#ffffff;
+  border:1px solid #cbd5e1;
+  border-radius:12px;
+  padding:18px 22px;
+  margin:10px 0;
+  box-shadow:0 2px 6px rgba(0,0,0,.07);
+}
+.rec-card .rec-title{font-size:1rem;font-weight:700;color:#0f172a;margin-bottom:6px}
+.rec-card .rec-action{font-size:.95rem;color:#1e293b;margin-bottom:6px}
+.rec-card .rec-meta{font-size:.82rem;color:#475569}
+.section-title{font-size:1.1rem;font-weight:700;color:#0f172a;margin:20px 0 10px;
+  padding-bottom:6px;border-bottom:2px solid #e2e8f0}
+.headline-card{
+  background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);
+  color:#ffffff!important;
+  border-radius:14px;
+  padding:22px 28px;
+  margin-bottom:20px;
+  font-size:1.15rem;
+  font-weight:600;
+  line-height:1.5;
+  box-shadow:0 4px 16px rgba(79,70,229,.3);
+}
 </style>""", unsafe_allow_html=True)
 
 #  Cached live data (1 hour TTL) 
@@ -233,48 +286,69 @@ with tabs[0]:
     summary = executive_summary(dff, fx)
     recs    = generate_recommendations(dff)
 
-    st.markdown(f'<div class="card card-blue" style="font-size:1.1rem;font-weight:600">{summary["headline"]}</div>', unsafe_allow_html=True)
+    # Headline gradient card
+    st.markdown(
+        f'<div class="headline-card">{summary["headline"]}</div>',
+        unsafe_allow_html=True
+    )
 
-    ex1,ex2,_ = st.columns([1,1,5])
+    ex1, ex2, _ = st.columns([1, 1, 5])
     with ex1:
-        st.download_button("Export Excel", to_excel(dff, summary),
+        st.download_button(
+            "Export Excel", to_excel(dff, summary),
             file_name=f"report_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True, type="primary")
+            use_container_width=True, type="primary",
+        )
     with ex2:
-        st.download_button("Export PDF", to_pdf(summary, recs),
+        st.download_button(
+            "Export PDF", to_pdf(summary, recs),
             file_name=f"report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf", use_container_width=True)
+            mime="application/pdf", use_container_width=True,
+        )
 
     st.markdown("---")
     cl, cr = st.columns(2)
+
     with cl:
-        st.markdown('<p class="section-title">KPIs</p>', unsafe_allow_html=True)
-        st.dataframe(pd.DataFrame(list(summary["kpis"].items()), columns=["Metric","Value"]),
-                     use_container_width=True, hide_index=True)
+        st.markdown('<p class="section-title">Key Performance Indicators</p>', unsafe_allow_html=True)
+        kpi_df = pd.DataFrame(list(summary["kpis"].items()), columns=["Metric", "Value"])
+        st.dataframe(kpi_df, use_container_width=True, hide_index=True)
+
         st.markdown('<p class="section-title">Top Insights</p>', unsafe_allow_html=True)
         for ins in summary["top_insights"]:
             st.markdown(f'<div class="card card-blue">{ins}</div>', unsafe_allow_html=True)
+
     with cr:
         st.markdown('<p class="section-title">Risks</p>', unsafe_allow_html=True)
         for r in summary["risks"]:
-            cls = "card-red" if "!" in r else "card-green"
+            cls = "card-red" if any(w in r for w in ["Warning","above","declined","High","risk"]) else "card-green"
             st.markdown(f'<div class="card {cls}">{r}</div>', unsafe_allow_html=True)
+
         st.markdown('<p class="section-title">Opportunities</p>', unsafe_allow_html=True)
         for o in summary["opportunities"]:
             st.markdown(f'<div class="card card-green">{o}</div>', unsafe_allow_html=True)
 
     st.markdown("---")
     st.markdown('<p class="section-title">Prioritised Recommendations</p>', unsafe_allow_html=True)
+    _p_colours = {
+        "High":   ("#dc2626", "#fef2f2"),
+        "Medium": ("#d97706", "#fffbeb"),
+        "Low":    ("#16a34a", "#f0fdf4"),
+    }
     for rec in recs:
-        border = "#ef4444" if "High" in rec["priority"] else "#f97316" if "Medium" in rec["priority"] else "#eab308"
-        st.markdown(f"""<div class="card" style="border-left:4px solid {border}">
-            <strong>{rec['priority']} &nbsp;|&nbsp; {rec['category']}</strong><br>
-            <span style="font-size:.95rem">{rec['action']}</span><br>
-            <small style="color:#64748b">Impact: {rec['impact']} &nbsp;&nbsp; Effort: {rec['effort']} &nbsp;&nbsp; Metric: {rec['metric']}</small>
-        </div>""", unsafe_allow_html=True)
-
-#  TAB 1: Price Optimizer 
+        key = "High" if "High" in rec["priority"] else ("Medium" if "Medium" in rec["priority"] else "Low")
+        bc, bg = _p_colours[key]
+        st.markdown(
+            f'<div class="rec-card" style="border-left:5px solid {bc};background:{bg}">'
+            f'<div class="rec-title">{rec["priority"]} | {rec["category"]}</div>'
+            f'<div class="rec-action">{rec["action"]}</div>'
+            f'<div class="rec-meta">Impact: <strong>{rec["impact"]}</strong>'
+            f' &nbsp;|&nbsp; Effort: <strong>{rec["effort"]}</strong>'
+            f' &nbsp;|&nbsp; Metric: <strong>{rec["metric"]}</strong></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 with tabs[1]:
     st.subheader("Dynamic Price Optimizer")
     st.caption("Computes revenue-maximising discount per category using price elasticity (Lerner index).")
