@@ -49,11 +49,28 @@ def to_excel(df: pd.DataFrame, summary: dict) -> bytes:
 
 # ── PDF export (via fpdf2) ────────────────────────────────────────────────────
 
+def _safe(text: str) -> str:
+    """
+    Strip characters that cannot be encoded by fpdf2's built-in latin-1 fonts.
+    Replaces rupee sign, emoji, and other non-latin chars with ASCII equivalents.
+    """
+    replacements = {
+        "₹": "Rs", "→": "->", "←": "<-", "•": "-",
+        "⚠️": "[!]", "✅": "[OK]", "💡": "[*]", "🔴": "[HIGH]",
+        "🟠": "[MED]", "🟡": "[LOW]", "🟢": "[OK]", "🔵": "[INFO]",
+        "**": "",
+    }
+    for src, dst in replacements.items():
+        text = text.replace(src, dst)
+    # final pass: drop anything outside latin-1
+    return text.encode("latin-1", errors="ignore").decode("latin-1")
+
+
 def to_pdf(summary: dict, recs: list[dict]) -> bytes:
     """
     Generate a clean PDF executive report.
     Returns bytes ready for st.download_button.
-    Falls back to a plain-text PDF if fpdf2 is not installed.
+    Falls back to plain-text bytes if fpdf2 is not installed.
     """
     try:
         from fpdf import FPDF  # type: ignore
@@ -76,7 +93,7 @@ def to_pdf(summary: dict, recs: list[dict]) -> bytes:
     # Headline
     pdf.set_font("Helvetica", "B", 13)
     pdf.set_text_color(30, 30, 30)
-    pdf.multi_cell(0, 8, summary.get("headline", ""))
+    pdf.multi_cell(0, 8, _safe(summary.get("headline", "")))
     pdf.ln(4)
 
     # KPIs
@@ -85,8 +102,8 @@ def to_pdf(summary: dict, recs: list[dict]) -> bytes:
     pdf.cell(0, 8, "Key Performance Indicators", ln=True, fill=True)
     pdf.set_font("Helvetica", "", 10)
     for k, v in summary.get("kpis", {}).items():
-        pdf.cell(70, 7, str(k), border="B")
-        pdf.cell(0,  7, str(v), border="B", ln=True)
+        pdf.cell(70, 7, _safe(str(k)), border="B")
+        pdf.cell(0,  7, _safe(str(v)), border="B", ln=True)
     pdf.ln(4)
 
     # Insights
@@ -95,8 +112,7 @@ def to_pdf(summary: dict, recs: list[dict]) -> bytes:
     pdf.cell(0, 8, "Top Insights", ln=True, fill=True)
     pdf.set_font("Helvetica", "", 10)
     for ins in summary.get("top_insights", []):
-        clean = ins.replace("**", "")
-        pdf.multi_cell(0, 6, f"• {clean}")
+        pdf.multi_cell(0, 6, f"- {_safe(ins)}")
     pdf.ln(4)
 
     # Risks
@@ -104,8 +120,15 @@ def to_pdf(summary: dict, recs: list[dict]) -> bytes:
     pdf.cell(0, 8, "Risks", ln=True, fill=True)
     pdf.set_font("Helvetica", "", 10)
     for r in summary.get("risks", []):
-        clean = r.replace("⚠️", "!").replace("✅", "OK")
-        pdf.multi_cell(0, 6, f"• {clean}")
+        pdf.multi_cell(0, 6, f"- {_safe(r)}")
+    pdf.ln(4)
+
+    # Opportunities
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.cell(0, 8, "Opportunities", ln=True, fill=True)
+    pdf.set_font("Helvetica", "", 10)
+    for o in summary.get("opportunities", []):
+        pdf.multi_cell(0, 6, f"- {_safe(o)}")
     pdf.ln(4)
 
     # Recommendations
@@ -115,12 +138,12 @@ def to_pdf(summary: dict, recs: list[dict]) -> bytes:
     pdf.set_font("Helvetica", "", 10)
     for i, rec in enumerate(recs, 1):
         pdf.set_font("Helvetica", "B", 10)
-        label = rec["priority"].replace("🔴","[HIGH]").replace("🟠","[MED]").replace("🟡","[LOW]")
-        pdf.cell(0, 7, f"{i}. {label}  |  {rec['category']}", ln=True)
+        label = _safe(f"{rec['priority']}  |  {rec['category']}")
+        pdf.cell(0, 7, f"{i}. {label}", ln=True)
         pdf.set_font("Helvetica", "", 10)
-        pdf.multi_cell(0, 6, f"   Action: {rec['action']}")
-        pdf.multi_cell(0, 6, f"   Impact: {rec['impact']}")
-        pdf.cell(0, 6, f"   Effort: {rec['effort']}  |  Metric: {rec['metric']}", ln=True)
+        pdf.multi_cell(0, 6, f"   Action: {_safe(rec['action'])}")
+        pdf.multi_cell(0, 6, f"   Impact: {_safe(rec['impact'])}")
+        pdf.cell(0, 6, f"   Effort: {rec['effort']}  |  Metric: {_safe(rec['metric'])}", ln=True)
         pdf.ln(2)
 
     return bytes(pdf.output())
