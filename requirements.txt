@@ -22,10 +22,13 @@ fpdf2>=2.7
 # Live data
 requests>=2.31
 
+# Supabase (optional - graceful fallback when not configured)
+supabase>=2.3
+
 # Dashboard
 streamlit>=1.32
 
-# API (optional, not needed for Streamlit Cloud)
+# API
 fastapi>=0.110
 uvicorn[standard]>=0.27
 pydantic>=2.5

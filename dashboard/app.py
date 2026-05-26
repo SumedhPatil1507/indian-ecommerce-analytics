@@ -1,5 +1,5 @@
 """
-dashboard/app.py  v3.0  -  IndiaCommerce Analytics
+dashboard/app.py  v4.0  -  IndiaCommerce Analytics
 Premium analytics platform. Live macro data. Multi-format file upload.
 """
 import io, os, sys
@@ -26,6 +26,16 @@ from modules.export          import to_excel, to_pdf
 from modules.price_optimizer import run_price_optimizer, plot_price_optimizer
 from modules.at_risk         import generate_at_risk_alerts, plot_at_risk
 from modules.model_drift     import compute_drift, compute_prediction_drift, plot_drift
+from data.connectors         import (
+    SHOPIFY_MOCK_SCHEMA, AMAZON_MOCK_SCHEMA, WOOCOMMERCE_MOCK_SCHEMA,
+    SIMULATION_CONFIG, generate_simulation, validate_schema,
+    from_shopify_webhook, from_amazon_orders, from_woocommerce,
+)
+from core.database import (
+    log_action, get_pending_actions, update_action_status,
+    cache_clv, load_clv_cache, cache_anomaly_scores, load_anomaly_cache,
+    cache_model_result, load_model_result, save_dataset,
+)
 
 st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
@@ -283,13 +293,84 @@ st.caption(f"USD equivalent: **${dff['revenue_usd'].sum():,.0f}**  (@ Rs{fx:.2f}
 st.markdown("---")
 #  TABS 
 tabs = st.tabs([
+    "Data Connector Matrix",
     "Executive Summary", "Price Optimizer", "At-Risk Customers", "Model Drift",
     "Revenue Trends", "Categories", "Regional",
     "Inventory", "CLV", "Anomalies", "Cohort", "Pareto",
+    "Operational Actions",
 ])
 
 #  TAB 0: Executive Summary 
+
+# TAB 0: Data Connector Matrix
 with tabs[0]:
+    st.subheader("Data Connector Matrix")
+    st.caption("Connect your e-commerce platform. All connectors normalise to the same internal schema.")
+    col_sh,col_am,col_woo,col_sim = st.columns(4)
+    with col_sh:
+        st.markdown('<div class="card card-blue"><strong>Shopify</strong><br><small>order/create webhook</small></div>', unsafe_allow_html=True)
+    with col_am:
+        st.markdown('<div class="card card-blue"><strong>Amazon Seller Central</strong><br><small>SP-API Orders v0</small></div>', unsafe_allow_html=True)
+    with col_woo:
+        st.markdown('<div class="card card-blue"><strong>WooCommerce</strong><br><small>REST API / DB dump</small></div>', unsafe_allow_html=True)
+    with col_sim:
+        st.markdown('<div class="card card-amber"><strong>Simulation Sandbox</strong><br><small>Demo only</small></div>', unsafe_allow_html=True)
+    st.markdown("---")
+    connector = st.selectbox("Select connector", ["Shopify Webhooks","Amazon Seller Central","WooCommerce","Simulation Sandbox","Generic File Upload"])
+    if connector == "Shopify Webhooks":
+        st.markdown('<p class="section-title">Shopify order/create Webhook Schema</p>', unsafe_allow_html=True)
+        st.caption(f"Source: {SHOPIFY_MOCK_SCHEMA['source']} | Docs: {SHOPIFY_MOCK_SCHEMA['docs']}")
+        st.markdown("**Required fields:** " + ", ".join(f"`{f}`" for f in SHOPIFY_MOCK_SCHEMA["required_fields"]))
+        st.json(SHOPIFY_MOCK_SCHEMA["sample"])
+        st.info("Configure a Shopify webhook pointing to POST /ingest/shopify on your FastAPI endpoint.")
+    elif connector == "Amazon Seller Central":
+        st.markdown('<p class="section-title">Amazon SP-API Orders Schema</p>', unsafe_allow_html=True)
+        st.caption(f"Source: {AMAZON_MOCK_SCHEMA['source']} | Docs: {AMAZON_MOCK_SCHEMA['docs']}")
+        st.markdown("**Required fields:** " + ", ".join(f"`{f}`" for f in AMAZON_MOCK_SCHEMA["required_fields"]))
+        st.json(AMAZON_MOCK_SCHEMA["sample"])
+        st.info("Use Amazon SP-API GET /orders/v0/orders and pipe response to from_amazon_orders().")
+    elif connector == "WooCommerce":
+        st.markdown('<p class="section-title">WooCommerce REST API / CSV Export Schema</p>', unsafe_allow_html=True)
+        st.caption(f"Source: {WOOCOMMERCE_MOCK_SCHEMA['source']} | Docs: {WOOCOMMERCE_MOCK_SCHEMA['docs']}")
+        st.markdown("**Required fields:** " + ", ".join(f"`{f}`" for f in WOOCOMMERCE_MOCK_SCHEMA["required_fields"]))
+        st.json(WOOCOMMERCE_MOCK_SCHEMA["sample"])
+        st.info("Export orders from WooCommerce admin or use REST API, then upload the CSV.")
+    elif connector == "Simulation Sandbox":
+        st.markdown('<div class="card card-amber"><strong>Simulation Sandbox</strong> - For demo and capability showcase ONLY. Use real connectors for production.</div>', unsafe_allow_html=True)
+        sc1,sc2,sc3 = st.columns(3)
+        sim_rows   = sc1.slider("Rows", 500, 10000, 3000, 500)
+        sim_months = sc2.slider("Months of history", 6, 36, 24)
+        sim_seed   = sc3.number_input("Seed", value=42, step=1)
+        if st.button("Generate Simulation Dataset", type="primary"):
+            with st.spinner("Generating from live macro signals..."):
+                from data.loader import fetch_worldbank as _fwb, fetch_usd_inr as _fx, _WB_GDP as _GDP, _WB_CPI as _CPI, _clean as _cl, _engineer as _eng
+                _gdp = _fwb(_GDP); _cpi = _fwb(_CPI)
+                gdp_g = float(_gdp["value"].iloc[-1])/100 if not _gdp.empty else 0.07
+                cpi_r = float(_cpi["value"].iloc[-1])/100 if not _cpi.empty else 0.05
+                fx_s  = _fx()
+                sim_df = generate_simulation(int(sim_rows), int(sim_months), gdp_g, cpi_r, fx_s, int(sim_seed))
+                sim_df = _eng(_cl(sim_df))
+                st.session_state["df"] = sim_df
+                st.session_state["fname"] = "simulation"
+                st.success(f"Generated {len(sim_df):,} rows | GDP={gdp_g*100:.1f}% CPI={cpi_r*100:.1f}% FX=Rs{fx_s:.2f}")
+                st.rerun()
+    else:
+        st.markdown('<p class="section-title">Generic File Upload</p>', unsafe_allow_html=True)
+        st.markdown("Upload CSV, TSV, Excel, JSON or Parquet matching the standard schema.")
+    if df is not None:
+        st.markdown("---")
+        st.markdown('<p class="section-title">Current Dataset Validation</p>', unsafe_allow_html=True)
+        validation = validate_schema(df)
+        if validation["valid"]:
+            st.success(f"Schema valid: {validation['row_count']:,} rows, {validation['col_count']} columns")
+        else:
+            if validation["missing_cols"]: st.error(f"Missing columns: {', '.join(validation['missing_cols'])}")
+            if validation["type_errors"]:  st.warning(f"Type errors: {', '.join(validation['type_errors'])}")
+        for w in validation["warnings"]: st.warning(w)
+        src = df["source"].mode()[0] if "source" in df.columns else "upload"
+        st.info(f"Source: {src} | Rows: {len(df):,} | {df['order_date'].min().date()} to {df['order_date'].max().date()}")
+
+with tabs[1]:
     summary = executive_summary(dff, fx)
     recs    = generate_recommendations(dff)
 
@@ -356,7 +437,7 @@ with tabs[0]:
             f'</div>',
             unsafe_allow_html=True,
         )
-with tabs[1]:
+with tabs[2]:
     st.subheader("Dynamic Price Optimizer")
     st.caption("Computes revenue-maximising discount per category using price elasticity (Lerner index).")
     with st.spinner("Running price optimisation..."):
@@ -379,7 +460,7 @@ with tabs[1]:
         st.warning("Not enough data to compute elasticity. Upload a larger dataset (500+ rows recommended).")
 
 #  TAB 2: At-Risk Customers 
-with tabs[2]:
+with tabs[3]:
     st.subheader("At-Risk Customer Automation")
     st.caption("Churn risk scoring using recency, frequency, and monetary signals. Identifies high-value customers at risk of churning.")
     top_n = st.slider("Customers to analyse", 20, 200, 50, 10)
@@ -403,7 +484,7 @@ with tabs[2]:
         st.warning("Not enough customer data for churn scoring.")
 
 #  TAB 3: Model Drift 
-with tabs[3]:
+with tabs[4]:
     st.subheader("Model Drift Monitoring")
     st.caption("Detects feature distribution shift (PSI) and prediction performance degradation between reference and current windows.")
     c1,c2 = st.columns(2)
@@ -436,7 +517,7 @@ with tabs[3]:
         st.info("Not enough data for drift analysis. Need at least 9 months of data.")
 
 #  TAB 4: Revenue Trends 
-with tabs[4]:
+with tabs[5]:
     st.subheader("Revenue Trends")
     m = dff.groupby("year_month")["revenue"].sum().reset_index()
     st.plotly_chart(px.line(m,x="year_month",y="revenue",markers=True,
@@ -457,7 +538,7 @@ with tabs[4]:
         template="plotly_white"),use_container_width=True)
 
 #  TAB 5: Categories 
-with tabs[5]:
+with tabs[6]:
     st.subheader("Category & Brand Analysis")
     c1,c2 = st.columns(2)
     c1.plotly_chart(px.pie(dff.groupby("category")["revenue"].sum().reset_index(),
@@ -475,7 +556,7 @@ with tabs[5]:
         template="plotly_white",barmode="group"),use_container_width=True)
 
 #  TAB 6: Regional 
-with tabs[6]:
+with tabs[7]:
     st.subheader("Regional Analysis")
     st.plotly_chart(px.bar(dff.groupby("state")["revenue"].sum().nlargest(15).reset_index(),
         x="revenue",y="state",orientation="h",title="Top 15 States by Revenue",
@@ -489,7 +570,7 @@ with tabs[6]:
         template="plotly_white"),use_container_width=True)
 
 #  TAB 7: Inventory 
-with tabs[7]:
+with tabs[8]:
     st.subheader("Inventory Alert System")
     from modules.inventory_alerts import compute_alerts
     alerts = compute_alerts(dff)
@@ -504,7 +585,7 @@ with tabs[7]:
         use_container_width=True,hide_index=True)
 
 #  TAB 8: CLV 
-with tabs[8]:
+with tabs[9]:
     st.subheader("Customer Lifetime Value")
     from modules.clv import compute_clv
     with st.spinner("Computing CLV..."):
@@ -521,7 +602,7 @@ with tabs[8]:
         use_container_width=True)
 
 #  TAB 9: Anomalies 
-with tabs[9]:
+with tabs[10]:
     st.subheader("Anomaly Detection")
     from modules.anomaly import anomaly_report
     with st.spinner("Detecting anomalies..."):
@@ -543,7 +624,7 @@ with tabs[9]:
         use_container_width=True)
 
 #  TAB 10: Cohort 
-with tabs[10]:
+with tabs[11]:
     st.subheader("Cohort Analysis")
     from modules.cohort import build_cohort_table
     c1,c2 = st.columns(2)
@@ -559,7 +640,7 @@ with tabs[10]:
         text_auto=".0f",template="plotly_white"),use_container_width=True)
 
 #  TAB 11: Pareto 
-with tabs[11]:
+with tabs[12]:
     st.subheader("Pareto & Concentration")
     agg = dff.groupby("category")["revenue"].sum().sort_values(ascending=False).reset_index()
     agg["cum_pct"] = agg["revenue"].cumsum()/agg["revenue"].sum()*100
@@ -589,6 +670,56 @@ with tabs[11]:
         xaxis_title="Cumulative share of orders",yaxis_title="Cumulative share of revenue",
         template="plotly_white")
     st.plotly_chart(fig2,use_container_width=True)
+
+
+# TAB 13: Operational Actions
+with tabs[13]:
+    st.subheader("Operational Actions")
+    st.caption("Approve or dismiss model recommendations. Actions logged to Supabase for audit trail.")
+    if not cfg.SUPABASE_READY:
+        st.warning("Supabase not configured. Add SUPABASE_URL + SUPABASE_ANON_KEY to secrets for persistence.")
+    act1, act2 = st.columns(2)
+    with act1:
+        st.markdown('<p class="section-title">Approve Price Optimisation</p>', unsafe_allow_html=True)
+        from modules.price_optimizer import run_price_optimizer as _rpo
+        with st.spinner("Loading recommendations..."):
+            _price_recs = _rpo(dff)
+        if not _price_recs.empty:
+            st.dataframe(_price_recs[["category","current_discount","optimal_discount","direction","revenue_impact_pct"]].head(10), use_container_width=True, hide_index=True)
+            if st.button("Approve All Price Adjustments", type="primary", use_container_width=True, key="approve_price"):
+                payload = _price_recs[["category","current_discount","optimal_discount","direction","revenue_impact_pct"]].to_dict(orient="records")
+                ok = log_action("price_approval", {"recommendations": payload, "count": len(payload)}, status="approved")
+                st.success(f"Approved {len(payload)} adjustments." + (" Logged to Supabase." if ok else " (Supabase not configured)"))
+            if st.button("Dismiss", use_container_width=True, key="dismiss_price"):
+                log_action("price_approval", {"count": len(_price_recs)}, status="dismissed")
+                st.info("Dismissed.")
+    with act2:
+        st.markdown('<p class="section-title">Export At-Risk Cohort</p>', unsafe_allow_html=True)
+        from modules.at_risk import generate_at_risk_alerts as _gara
+        with st.spinner("Scoring churn risk..."):
+            _at_risk_ops = _gara(dff, top_n=100)
+        if not _at_risk_ops.empty:
+            crit = int((_at_risk_ops["risk_label"]=="Critical").sum())
+            high = int((_at_risk_ops["risk_label"]=="High").sum())
+            st.metric("Critical customers", crit)
+            st.metric("High-risk customers", high)
+            _exp_cols = [c for c in ["customer_id","churn_risk_score","risk_label","value_tier","total_revenue","recommended_action"] if c in _at_risk_ops.columns]
+            st.download_button("Export CSV (Klaviyo / SendGrid import)", _at_risk_ops[_exp_cols].to_csv(index=False).encode(),
+                file_name=f"at_risk_{pd.Timestamp.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True, type="primary", key="export_atrisk")
+            if st.button("Log Export to Supabase", use_container_width=True, key="log_export"):
+                ok = log_action("at_risk_export", {"exported": len(_at_risk_ops), "critical": crit, "high": high}, status="exported")
+                st.success("Logged." if ok else "Supabase not configured.")
+    st.markdown("---")
+    st.markdown('<p class="section-title">Pending Actions Log</p>', unsafe_allow_html=True)
+    _pending = get_pending_actions()
+    if _pending:
+        st.dataframe(pd.DataFrame(_pending)[["id","action_type","status","source","created_at"]], use_container_width=True, hide_index=True)
+        _aid = st.number_input("Action ID to update", min_value=1, step=1)
+        _ns  = st.selectbox("New status", ["approved","dismissed","exported"])
+        if st.button("Update Status"):
+            update_action_status(int(_aid), _ns); st.rerun()
+    else:
+        st.info("No pending actions. Configure Supabase or approve/dismiss recommendations above.")
 
 #  FOOTER 
 st.markdown("---")
