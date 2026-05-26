@@ -53,14 +53,14 @@ def compute_alerts(df: pd.DataFrame) -> pd.DataFrame:
     # alert logic
     def _alert(row):
         if row["avg_units_sold"] >= vel_thresh and row["high_pressure_pct"] >= 60:
-            return " CRITICAL  Reorder Now"
+            return "CRITICAL - Reorder Now"
         if row["avg_units_sold"] >= vel_thresh and row["high_pressure_pct"] >= 30:
-            return " HIGH  Monitor Closely"
+            return "HIGH - Monitor Closely"
         if row["avg_discount"] >= DISCOUNT_SPIKE_THRESH and row["high_pressure_pct"] >= 50:
-            return " CLEARANCE  Excess Stock"
+            return "CLEARANCE - Excess Stock"
         if row["avg_units_sold"] < grp["avg_units_sold"].quantile(0.20):
-            return " SLOW MOVER  Review Listing"
-        return " HEALTHY"
+            return "SLOW MOVER - Review Listing"
+        return "HEALTHY"
 
     grp["alert_level"] = grp.apply(_alert, axis=1)
 

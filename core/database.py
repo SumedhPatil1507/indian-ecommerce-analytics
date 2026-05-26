@@ -48,7 +48,7 @@ def _df_hash(df: pd.DataFrame) -> str:
     ).hexdigest()[:16]
 
 
-# ── Operational Actions ───────────────────────────────────────────────────────
+#  Operational Actions 
 
 def log_action(
     action_type: str,
@@ -109,7 +109,7 @@ def get_pending_actions(action_type: str | None = None) -> list[dict]:
         return []
 
 
-# ── CLV Cache ─────────────────────────────────────────────────────────────────
+#  CLV Cache 
 
 def cache_clv(df: pd.DataFrame, clv_df: pd.DataFrame) -> bool:
     """Store CLV tier results keyed by dataset hash."""
@@ -151,7 +151,7 @@ def load_clv_cache(df: pd.DataFrame) -> pd.DataFrame | None:
         return None
 
 
-# ── Anomaly Cache ─────────────────────────────────────────────────────────────
+#  Anomaly Cache 
 
 def cache_anomaly_scores(df: pd.DataFrame, anom_df: pd.DataFrame) -> bool:
     """Store weekly anomaly scores."""
@@ -193,7 +193,7 @@ def load_anomaly_cache(df: pd.DataFrame) -> pd.DataFrame | None:
         return None
 
 
-# ── Model Results Cache ───────────────────────────────────────────────────────
+#  Model Results Cache 
 
 def cache_model_result(model_name: str, df: pd.DataFrame, result: Any) -> bool:
     """Cache heavy model output (Prophet, SARIMA, MLP) keyed by model+data hash."""
@@ -235,7 +235,7 @@ def load_model_result(model_name: str, df: pd.DataFrame, max_age_hours: int = 24
         return None
 
 
-# ── Dataset Storage ───────────────────────────────────────────────────────────
+#  Dataset Storage 
 
 def save_dataset(df: pd.DataFrame, name: str = "dataset") -> bool:
     client = _client()

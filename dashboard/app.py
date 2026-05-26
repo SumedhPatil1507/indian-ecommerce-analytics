@@ -574,8 +574,13 @@ with tabs[8]:
     st.subheader("Inventory Alert System")
     from modules.inventory_alerts import compute_alerts
     alerts = compute_alerts(dff)
-    cmap = {" CRITICAL  Reorder Now":"#ef4444"," HIGH  Monitor Closely":"#f97316",
-            " CLEARANCE  Excess Stock":"#eab308"," SLOW MOVER  Review Listing":"#3b82f6"," HEALTHY":"#22c55e"}
+    cmap = {
+        "CRITICAL - Reorder Now":    "#ef4444",
+        "HIGH - Monitor Closely":    "#f97316",
+        "CLEARANCE - Excess Stock":  "#eab308",
+        "SLOW MOVER - Review Listing":"#3b82f6",
+        "HEALTHY":                   "#22c55e",
+    }
     st.plotly_chart(px.scatter(alerts,x="avg_discount",y="avg_units_sold",color="alert_level",
         size="high_pressure_pct",hover_data=["category","zone","recommendation"],
         color_discrete_map=cmap,title="Inventory Alert Dashboard",template="plotly_white"),use_container_width=True)
@@ -588,8 +593,15 @@ with tabs[8]:
 with tabs[9]:
     st.subheader("Customer Lifetime Value")
     from modules.clv import compute_clv
-    with st.spinner("Computing CLV..."):
-        clv_df = compute_clv(dff)
+    # Try Supabase cache first
+    clv_df = load_clv_cache(dff)
+    if clv_df is None:
+        with st.spinner("Computing CLV... (result will be cached)"):
+            clv_df = compute_clv(dff)
+            cache_clv(dff, clv_df)
+        st.caption("CLV computed fresh and cached to Supabase (24h TTL).")
+    else:
+        st.caption("CLV loaded from Supabase cache (< 24h old).")
     c1,c2 = st.columns(2)
     c1.plotly_chart(px.histogram(clv_df,x="clv",color="clv_tier",nbins=50,
         title="CLV Distribution",template="plotly_white",marginal="box"),use_container_width=True)
@@ -605,8 +617,18 @@ with tabs[9]:
 with tabs[10]:
     st.subheader("Anomaly Detection")
     from modules.anomaly import anomaly_report
-    with st.spinner("Detecting anomalies..."):
-        anom = anomaly_report(dff)
+    # Try Supabase cache first (weekly TTL)
+    anom_cached = load_anomaly_cache(dff)
+    if anom_cached is not None:
+        st.caption("Anomaly scores loaded from Supabase cache (< 7 days old).")
+        anom = anomaly_report(dff)  # still run full for scatter plots
+        cache_note = "cached"
+    else:
+        with st.spinner("Detecting anomalies... (scores will be cached)"):
+            anom = anomaly_report(dff)
+            cache_anomaly_scores(dff, anom)
+        cache_note = "fresh"
+        st.caption("Anomaly scores computed fresh and cached to Supabase (7-day TTL).")
     c1,c2 = st.columns(2)
     c1.plotly_chart(px.scatter(anom,x="log_units_sold",y="log_revenue",color="confirmed_anomaly",
         color_discrete_map={True:"#ef4444",False:"#94a3b8"},opacity=0.5,
@@ -617,7 +639,7 @@ with tabs[10]:
         title="Discount % vs log(Final Price)",hover_data=["category","zone"],
         template="plotly_white"),use_container_width=True)
     n = anom["confirmed_anomaly"].sum()
-    st.info(f"Confirmed anomalies (>=2 detectors): **{n:,}** ({n/len(anom):.2%})")
+    st.info(f"Confirmed anomalies (>=2 detectors): **{n:,}** ({n/len(anom):.2%}) | Source: {cache_note}")
     st.plotly_chart(px.bar(
         anom[anom["confirmed_anomaly"]].groupby("category").size().reset_index(name="count").sort_values("count",ascending=False),
         x="category",y="count",color="category",title="Anomalies by Category",template="plotly_white"),

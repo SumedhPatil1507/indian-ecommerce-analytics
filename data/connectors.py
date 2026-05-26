@@ -31,7 +31,7 @@ import pandas as pd
 
 logger = logging.getLogger(__name__)
 
-# ── Standard schema definition ────────────────────────────────────────────────
+#  Standard schema definition 
 
 REQUIRED_COLUMNS = [
     "order_id", "order_date", "state", "zone", "category", "brand_type",
@@ -52,7 +52,7 @@ COLUMN_TYPES = {
     "revenue":              "float",
 }
 
-# ── Shopify Webhook Connector ─────────────────────────────────────────────────
+#  Shopify Webhook Connector 
 
 SHOPIFY_MOCK_SCHEMA = {
     "description": "Shopify order/create webhook payload",
@@ -128,7 +128,7 @@ def from_shopify_webhook(payload: dict | list) -> pd.DataFrame:
     return _finalise(pd.DataFrame(rows))
 
 
-# ── Amazon Seller Central Connector ──────────────────────────────────────────
+#  Amazon Seller Central Connector 
 
 AMAZON_MOCK_SCHEMA = {
     "description": "Amazon Seller Central Orders API response",
@@ -205,7 +205,7 @@ def from_amazon_orders(payload: dict | list) -> pd.DataFrame:
     return _finalise(pd.DataFrame(rows))
 
 
-# ── WooCommerce DB Dump Connector ─────────────────────────────────────────────
+#  WooCommerce DB Dump Connector 
 
 WOOCOMMERCE_MOCK_SCHEMA = {
     "description": "WooCommerce MySQL/CSV export",
@@ -273,7 +273,7 @@ def from_woocommerce(payload: dict | list) -> pd.DataFrame:
     return _finalise(pd.DataFrame(rows))
 
 
-# ── Simulation Sandbox ────────────────────────────────────────────────────────
+#  Simulation Sandbox 
 
 SIMULATION_CONFIG = {
     "description": (
@@ -376,7 +376,7 @@ def generate_simulation(
     return df
 
 
-# ── Schema validation ─────────────────────────────────────────────────────────
+#  Schema validation 
 
 def validate_schema(df: pd.DataFrame) -> dict:
     """
@@ -421,7 +421,7 @@ def validate_schema(df: pd.DataFrame) -> dict:
     }
 
 
-# ── Helper functions ──────────────────────────────────────────────────────────
+#  Helper functions 
 
 _STATE_ZONE_MAP = {
     "Maharashtra": "West",  "Gujarat": "West",    "Rajasthan": "West",
