@@ -5,6 +5,13 @@ Coupled entirely to FastAPI REST engine and Celery background workers.
 import io
 import os
 import sys
+
+# Initialize sys.path with project root so local modules are visible
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 import time
 import requests
 import numpy as np
