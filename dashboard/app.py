@@ -1,13 +1,12 @@
 """
-dashboard/app.py  v4.0  -  IndiaCommerce Analytics
-Premium analytics platform. Live macro data. Multi-format file upload.
+dashboard/app.py  v5.0  -  IndiaCommerce Analytics (Stateless Viewer)
+Coupled entirely to FastAPI REST engine and Celery background workers.
 """
-import io, os, sys
-_HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
-if _ROOT not in sys.path:
-    sys.path.insert(0, _ROOT)
-
+import io
+import os
+import sys
+import time
+import requests
 import numpy as np
 import pandas as pd
 import plotly.express as px
@@ -15,31 +14,20 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
 
+# Config variables
 import core.config as cfg
-from data.loader import (
-    _clean, _engineer, load_any,
-    fetch_worldbank, fetch_usd_inr, fetch_google_trends,
-    _WB_GDP, _WB_CPI,
-)
-from modules.insights        import executive_summary, generate_recommendations
-from modules.export          import to_excel, to_pdf
-from modules.price_optimizer import run_price_optimizer, plot_price_optimizer
-from modules.at_risk         import generate_at_risk_alerts, plot_at_risk
-from modules.model_drift     import compute_drift, compute_prediction_drift, plot_drift
-from data.connectors         import (
+from data.connectors import (
     SHOPIFY_MOCK_SCHEMA, AMAZON_MOCK_SCHEMA, WOOCOMMERCE_MOCK_SCHEMA,
     SIMULATION_CONFIG, generate_simulation, validate_schema,
-    from_shopify_webhook, from_amazon_orders, from_woocommerce,
 )
-from core.database import (
-    log_action, get_pending_actions, update_action_status,
-    cache_clv, load_clv_cache, cache_anomaly_scores, load_anomaly_cache,
-    cache_model_result, load_model_result, save_dataset,
-)
+
+# API Endpoint Configuration
+API_URL = os.getenv("API_URL", "http://localhost:8000")
 
 st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
 
+# CSS Styling (Identical custom theme)
 CSS = """
 <style>
 html,body,[class*="css"],.stApp,.main,.block-container,
@@ -123,632 +111,724 @@ p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,
 """
 st.markdown(CSS, unsafe_allow_html=True)
 
-#  Cached live data (1 hour TTL) 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _live_macro():
-    return fetch_worldbank(_WB_GDP), fetch_worldbank(_WB_CPI), fetch_usd_inr()
 
-@st.cache_data(ttl=3600, show_spinner=False)
-def _live_trends():
-    try: return fetch_google_trends(timeframe="today 3-m")
-    except: return pd.DataFrame()
+# --- REST Helper Methods ---
 
-@st.cache_data(show_spinner="Processing file...")
-def _from_upload(raw: bytes, fname: str) -> pd.DataFrame:
-    return load_any(io.BytesIO(raw), fname)
+def _get_headers() -> dict:
+    token = st.session_state.get("access_token", "")
+    return {"Authorization": f"Bearer {token}"} if token else {}
 
-#  SIDEBAR 
+
+def api_get(endpoint: str, params: dict = None) -> dict | None:
+    try:
+        resp = requests.get(f"{API_URL}{endpoint}", headers=_get_headers(), params=params, timeout=15)
+        if resp.status_code == 401:
+            st.session_state.pop("access_token", None)
+            st.rerun()
+        if resp.status_code == 200:
+            return resp.json()
+        return None
+    except Exception as e:
+        logger.error("API GET %s failed: %s", endpoint, e)
+        return None
+
+
+def api_post(endpoint: str, json_data: dict = None, files: dict = None) -> dict | None:
+    try:
+        if files:
+            resp = requests.post(f"{API_URL}{endpoint}", headers=_get_headers(), files=files, timeout=60)
+        else:
+            resp = requests.post(f"{API_URL}{endpoint}", headers=_get_headers(), json=json_data, timeout=15)
+        if resp.status_code == 401:
+            st.session_state.pop("access_token", None)
+            st.rerun()
+        if resp.status_code in (200, 201):
+            return resp.json()
+        return None
+    except Exception as e:
+        logger.error("API POST %s failed: %s", endpoint, e)
+        return None
+
+
+def wait_for_task(task_id: str):
+    """Render a spinner and block until a background Celery task completes."""
+    with st.spinner("Processing computation on background worker..."):
+        while True:
+            res = api_get(f"/tasks/status/{task_id}")
+            if not res:
+                st.error("Error connecting to Celery task monitor")
+                break
+            state = res.get("status")
+            if state == "SUCCESS":
+                st.success("Task completed successfully!")
+                time.sleep(1.5)
+                break
+            elif state in ("FAILURE", "REVOKED"):
+                st.error(f"Task execution failed: {res.get('result')}")
+                break
+            time.sleep(1)
+
+
+# --- USER AUTHENTICATION SCREEN ---
+
+if not st.session_state.get("access_token"):
+    st.markdown("<h2 style='text-align: center;'>Welcome to IndiaCommerce Analytics</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #64748b;'>Stateless Multi-Tenant Relational Insights Platform</p>", unsafe_allow_html=True)
+    
+    auth_mode = st.tabs(["Login", "Sign Up"])
+    
+    with auth_mode[0]:
+        with st.form("login_form"):
+            email = st.text_input("Email Address")
+            password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Sign In", type="primary")
+            if submitted:
+                res = api_post("/auth/login", json_data={"email": email, "password": password})
+                if res and "access_token" in res:
+                    st.session_state["access_token"] = res["access_token"]
+                    st.session_state["email"] = res["email"]
+                    st.session_state["user_id"] = res["user_id"]
+                    st.success("Logged in successfully!")
+                    st.rerun()
+                else:
+                    st.error("Authentication failed. Invalid email or password.")
+                    
+    with auth_mode[1]:
+        with st.form("signup_form"):
+            new_email = st.text_input("Email Address")
+            new_password = st.text_input("Password", type="password")
+            submitted = st.form_submit_button("Sign Up")
+            if submitted:
+                res = api_post("/auth/signup", json_data={"email": new_email, "password": new_password})
+                if res and res.get("status") == "success":
+                    st.success("Registration complete! You can now log in.")
+                else:
+                    st.error("Failed to register tenant.")
+    st.stop()
+
+
+# --- LOGGED IN STATE ---
+
+# Load profile
+profile = api_get("/profile")
+tenant_id = st.session_state["user_id"]
+tenant_email = st.session_state["email"]
+
+# Load database orders metadata
+kpis = api_get("/analytics/kpis") or {}
+total_orders = kpis.get("total_orders", 0)
+
+# Load macro signals (exchangerate, world bank, google trends)
+# (Decoupled macro fetching handled inside API)
+macro_res = api_get("/health")  # checks connection
+
+
+# --- SIDEBAR & INGESTION ---
+
 with st.sidebar:
     st.markdown(f"### {cfg.APP_NAME}")
-    st.caption(f"v{cfg.APP_VERSION}")
+    st.caption(f"Authenticated as: **{tenant_email}**")
+    st.caption(f"Tenant ID: `{tenant_id}`")
     st.markdown("---")
 
-    #  Data source 
-    st.markdown("### Data Source")
-    df = st.session_state.get("df")
-
-    if df is not None:
-        st.success(f"{len(df):,} rows loaded")
-        fname = st.session_state.get("fname","dataset")
-        st.caption(f"File: {fname}")
-        if st.button("Clear & upload new file", use_container_width=True):
-            del st.session_state["df"]
-            st.session_state.pop("fname", None)
+    # Ingestion Controls
+    st.markdown("### Ingest Transaction Data")
+    if total_orders > 0:
+        st.success(f"{total_orders:,} transaction rows loaded in PostgreSQL")
+        if st.button("Ingest new file", use_container_width=True):
+            # Simulated clear (doesn't wipe db, just allows uploading another file)
+            total_orders = 0
             st.rerun()
     else:
         up = st.file_uploader(
             "Upload dataset",
-            type=["csv","tsv","xlsx","xls","json","parquet"],
-            help="Supported: CSV, TSV, Excel (.xlsx/.xls), JSON, Parquet",
+            type=["csv", "tsv", "xlsx", "xls", "json", "parquet"],
+            help="Supported: CSV, TSV, Excel, JSON, Parquet"
         )
-        st.caption(f"[Download Kaggle dataset]({cfg.KAGGLE_URL})")
         if up:
             try:
-                df = _from_upload(up.read(), up.name)
-                st.session_state["df"]   = df
-                st.session_state["fname"] = up.name
-                st.success(f"{len(df):,} rows loaded")
-                st.rerun()
+                # Upload directly to API
+                files = {"file": (up.name, up.read())}
+                res = api_post("/orders/upload", files=files)
+                if res and "task_id" in res:
+                    wait_for_task(res["task_id"])
+                    st.rerun()
+                else:
+                    st.error("Failed to upload orders.")
             except Exception as e:
-                st.error(f"Could not parse file: {e}")
+                st.error(f"Upload error: {e}")
 
     st.markdown("---")
+    
+    # Recalculation commands (Triggers worker tasks)
+    st.markdown("### Recalculate Operations")
+    col1, col2 = st.columns(2)
+    if col1.button("Pricing", use_container_width=True):
+        res = api_post("/analytics/price-optimizer/recalculate")
+        if res and "task_id" in res:
+            wait_for_task(res["task_id"])
+            st.rerun()
+            
+    if col2.button("CLV & Churn", use_container_width=True):
+        res = api_post("/analytics/clv/recalculate")
+        if res and "task_id" in res:
+            wait_for_task(res["task_id"])
+            st.rerun()
 
-    #  Live data controls 
-    st.markdown("### Live Signals")
-    if st.button("Refresh live data", use_container_width=True):
-        st.cache_data.clear(); st.rerun()
-    st.caption("Auto-refreshes every hour.")
+    col3, col4 = st.columns(2)
+    if col3.button("Anomalies", use_container_width=True):
+        res = api_post("/analytics/anomalies/recalculate")
+        if res and "task_id" in res:
+            wait_for_task(res["task_id"])
+            st.rerun()
+            
+    if col4.button("Model Drift", use_container_width=True):
+        res = api_post("/analytics/drift/recalculate")
+        if res and "task_id" in res:
+            wait_for_task(res["task_id"])
+            st.rerun()
 
-    #  Filters (only when data loaded) 
-    if df is not None:
-        st.markdown("---")
-        st.markdown("### Filters")
-        zones  = st.multiselect("Zone",        sorted(df["zone"].unique()),       default=sorted(df["zone"].unique()))
-        cats   = st.multiselect("Category",    sorted(df["category"].unique()),   default=sorted(df["category"].unique()))
-        brands = st.multiselect("Brand Type",  sorted(df["brand_type"].unique()), default=sorted(df["brand_type"].unique()))
-        events = st.multiselect("Sales Event", sorted(df["sales_event"].unique()),default=sorted(df["sales_event"].unique()))
+    st.markdown("---")
+    if st.button("Sign Out", type="primary", use_container_width=True):
+        st.session_state.pop("access_token", None)
+        st.rerun()
 
-#  HEADER 
+
+# --- HEADER & KEY KPIs ---
+
 st.markdown(f"""
 <div style="display:flex;align-items:center;gap:12px;margin-bottom:4px">
-  <span style="font-size:2rem"></span>
   <span style="font-size:1.75rem;font-weight:800;color:#1e293b">{cfg.APP_NAME}</span>
 </div>
 <p style="color:#64748b;font-size:.9rem;margin-bottom:20px">
-  <a href="https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/" target="_blank">Live App</a>
-  &nbsp;&nbsp;
-  <a href="https://github.com/SumedhPatil1507/indian-ecommerce-analytics" target="_blank">GitHub</a>
-  &nbsp;&nbsp; World Bank (CC BY 4.0)  fawazahmed0/exchange-api (CC0)  pytrends (Apache 2.0)
+  Multi-tenant Relational DB Mode | Isolated via Row-Level Security | Distributed Celery Workers
 </p>
 """, unsafe_allow_html=True)
 
-#  LIVE MACRO (always visible, no dataset needed) 
-gdp_df, cpi_df, fx = _live_macro()
-trends_df = _live_trends()
 
-gdp_val   = float(gdp_df["value"].iloc[-1])  if not gdp_df.empty else None
-cpi_val   = float(cpi_df["value"].iloc[-1])  if not cpi_df.empty else None
-gdp_delta = round(gdp_df["value"].iloc[-1]-gdp_df["value"].iloc[-2],2) if len(gdp_df)>=2 else None
-cpi_delta = round(cpi_df["value"].iloc[-1]-cpi_df["value"].iloc[-2],2) if len(cpi_df)>=2 else None
-trend_val = float(trends_df.mean().mean()) if not trends_df.empty else None
-
-c1,c2,c3,c4 = st.columns(4)
-c1.metric("India GDP Growth",  f"{gdp_val:.2f}%"      if gdp_val  else "N/A",
-          delta=f"{gdp_delta:+.2f}pp" if gdp_delta else None, help="World Bank Open Data (CC BY 4.0)")
-c2.metric("CPI Inflation",     f"{cpi_val:.2f}%"      if cpi_val  else "N/A",
-          delta=f"{cpi_delta:+.2f}pp" if cpi_delta else None, help="World Bank Open Data (CC BY 4.0)")
-c3.metric("USD / INR",         f"Rs{fx:.2f}",          help="fawazahmed0/exchange-api (CC0)")
-c4.metric("Search Interest",   f"{trend_val:.1f}/100" if trend_val else "N/A",
-          help="Google Trends via pytrends (Apache 2.0)  India  last 3 months")
-
-with st.expander("GDP & CPI history (World Bank)", expanded=False):
-    col1,col2 = st.columns(2)
-    if not gdp_df.empty:
-        col1.plotly_chart(px.line(gdp_df,x="year",y="value",markers=True,
-            title="India GDP Growth (%)",template="plotly_white",
-            labels={"value":"GDP %","year":"Year"},
-            color_discrete_sequence=["#4f46e5"]),use_container_width=True)
-    if not cpi_df.empty:
-        col2.plotly_chart(px.line(cpi_df,x="year",y="value",markers=True,
-            title="India CPI Inflation (%)",template="plotly_white",
-            labels={"value":"CPI %","year":"Year"},
-            color_discrete_sequence=["#ef4444"]),use_container_width=True)
-    st.caption("Source: World Bank Open Data https://data.worldbank.org/country/india (CC BY 4.0)")
-
-if not trends_df.empty:
-    with st.expander("Google Trends - E-commerce search interest (India)", expanded=False):
-        tr = trends_df.copy(); tr.index.name = "date"
-        tp = tr.reset_index().melt(id_vars="date",var_name="keyword",value_name="interest")
-        st.plotly_chart(px.line(tp,x="date",y="interest",color="keyword",
-            title="Search Interest (0-100)",template="plotly_white"),use_container_width=True)
-        st.caption("Source: Google Trends via pytrends https://github.com/GeneralMills/pytrends (Apache 2.0)")
-
-st.markdown("---")
-
-#  NO DATA STATE 
-if df is None:
+# Render primary DB metrics
+if total_orders > 0:
+    rev_cr = kpis.get("total_revenue", 0.0) / 1e7
+    k1, k2, k3, k4, k5 = st.columns(5)
+    k1.metric("Total Revenue", f"Rs{rev_cr:.1f} Cr")
+    k2.metric("Total Orders", f"{kpis.get('total_orders', 0):,}")
+    k3.metric("Avg Order Value", f"Rs{kpis.get('aov', 0):,.0f}")
+    k4.metric("Avg Discount", f"{kpis.get('avg_discount', 0):.1f}%")
+    k5.metric("Avg Units / Order", f"{kpis.get('avg_units_sold', 0):.1f}")
+    st.markdown("---")
+else:
     st.markdown(f"""
     <div style="text-align:center;padding:60px 20px;background:#fff;border-radius:16px;
          border:1px solid #e2e8f0;margin-top:20px">
-      <div style="font-size:3rem"></div>
-      <h2 style="color:#1e293b;margin:12px 0 8px">Upload your dataset to unlock full analytics</h2>
+      <h2 style="color:#1e293b;margin:12px 0 8px">Ingest a dataset via the sidebar to get started</h2>
       <p style="color:#64748b;font-size:1.05rem;max-width:500px;margin:0 auto 20px">
-        Upload CSV, Excel, JSON or Parquet via the sidebar.<br>
-        Live macro signals above update automatically every hour.
+        Upload order logs in CSV, Parquet, or Excel format. Or run simulated sandbox data inside the Data Connector Matrix.
       </p>
-      <a href="{cfg.KAGGLE_URL}" target="_blank"
-         style="background:#4f46e5;color:#fff;padding:10px 24px;border-radius:8px;
-                text-decoration:none;font-weight:600">
-        Download Kaggle Dataset
-      </a>
     </div>""", unsafe_allow_html=True)
-    st.stop()
 
-#  APPLY FILTERS 
-dff = df[
-    df["zone"].isin(zones) & df["category"].isin(cats) &
-    df["brand_type"].isin(brands) & df["sales_event"].isin(events)
-].copy()
 
-# Merge live macro into filtered df
-if not gdp_df.empty:
-    macro = gdp_df[["year","value"]].rename(columns={"value":"india_gdp_growth_pct"})
-    macro = macro.merge(
-        cpi_df[["year","value"]].rename(columns={"value":"india_cpi_inflation_pct"}),
-        on="year", how="outer")
-    dff = dff.merge(macro, on="year", how="left")
-dff["usd_inr_rate"] = fx
-dff["revenue_usd"]  = (dff["revenue"] / fx).round(2)
+# --- TABS (15 total, including Observability) ---
 
-#  DATASET KPIs 
-rev_cr = dff["revenue"].sum() / 1e7
-k1,k2,k3,k4,k5 = st.columns(5)
-k1.metric("Total Revenue",     f"Rs{rev_cr:.1f} Cr")
-k2.metric("Total Orders",      f"{len(dff):,}")
-k3.metric("Avg Order Value",   f"Rs{dff['revenue'].mean():,.0f}")
-k4.metric("Avg Discount",      f"{dff['discount_percent'].mean():.1f}%")
-k5.metric("Avg Units / Order", f"{dff['units_sold'].mean():.1f}")
-st.caption(f"USD equivalent: **${dff['revenue_usd'].sum():,.0f}**  (@ Rs{fx:.2f}/USD)  |  {len(dff):,} of {len(df):,} orders shown")
-st.markdown("---")
-#  TABS 
-tabs = st.tabs([
-    "Data Connector Matrix",
-    "Executive Summary", "Price Optimizer", "At-Risk Customers", "Model Drift",
-    "Revenue Trends", "Categories", "Regional",
-    "Inventory", "CLV", "Anomalies", "Cohort", "Pareto",
-    "Operational Actions",
-])
+tabs_names = [
+    "Data Connector Matrix", "Executive Summary", "Price Optimizer", 
+    "At-Risk Customers", "Model Drift", "Revenue Trends", "Categories", 
+    "Regional", "Inventory", "CLV", "Anomalies", "Cohort", "Pareto", 
+    "Operational Actions", "Observability (OpenTelemetry)"
+]
 
-#  TAB 0: Executive Summary 
+tabs = st.tabs(tabs_names)
 
-# TAB 0: Data Connector Matrix
+
+# --- TAB 0: DATA CONNECTOR MATRIX ---
+
 with tabs[0]:
     st.subheader("Data Connector Matrix")
-    st.caption("Connect your e-commerce platform. All connectors normalise to the same internal schema.")
-    col_sh,col_am,col_woo,col_sim = st.columns(4)
+    st.caption("Secure cryptographic webhooks. Payloads are verified using tenant signature secrets.")
+    col_sh, col_am, col_woo, col_sim = st.columns(4)
     with col_sh:
-        st.markdown('<div class="card card-blue"><strong>Shopify</strong><br><small>order/create webhook</small></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card card-blue"><strong>Shopify Webhook</strong><br><small>POST /ingest/shopify</small></div>', unsafe_allow_html=True)
     with col_am:
-        st.markdown('<div class="card card-blue"><strong>Amazon Seller Central</strong><br><small>SP-API Orders v0</small></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card card-blue"><strong>Amazon Ingestion</strong><br><small>POST /ingest/amazon</small></div>', unsafe_allow_html=True)
     with col_woo:
-        st.markdown('<div class="card card-blue"><strong>WooCommerce</strong><br><small>REST API / DB dump</small></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card card-blue"><strong>WooCommerce Webhook</strong><br><small>POST /ingest/woocommerce</small></div>', unsafe_allow_html=True)
     with col_sim:
-        st.markdown('<div class="card card-amber"><strong>Simulation Sandbox</strong><br><small>Demo only</small></div>', unsafe_allow_html=True)
+        st.markdown('<div class="card card-amber"><strong>Simulation Sandbox</strong><br><small>Celery task queuing</small></div>', unsafe_allow_html=True)
+    
     st.markdown("---")
-    connector = st.selectbox("Select connector", ["Shopify Webhooks","Amazon Seller Central","WooCommerce","Simulation Sandbox","Generic File Upload"])
+    
+    connector = st.selectbox("Select connector info", ["Shopify Webhooks", "Amazon Ingestion", "WooCommerce Webhooks", "Simulation Sandbox"])
+    
+    # Show tenant secret and endpoint paths
+    tenant_sec = profile.get("webhook_secret") if profile else "loading..."
+    
     if connector == "Shopify Webhooks":
-        st.markdown('<p class="section-title">Shopify order/create Webhook Schema</p>', unsafe_allow_html=True)
-        st.caption(f"Source: {SHOPIFY_MOCK_SCHEMA['source']} | Docs: {SHOPIFY_MOCK_SCHEMA['docs']}")
-        st.markdown("**Required fields:** " + ", ".join(f"`{f}`" for f in SHOPIFY_MOCK_SCHEMA["required_fields"]))
+        st.markdown("<p class='section-title'>Shopify Webhook Cryptographic Details</p>", unsafe_allow_html=True)
+        st.info(f"Endpoint: `POST {API_URL}/ingest/shopify?tenant_id={tenant_id}`")
+        st.info(f"Verification Secret (add to Shopify settings): `{tenant_sec}`")
         st.json(SHOPIFY_MOCK_SCHEMA["sample"])
-        st.info("Configure a Shopify webhook pointing to POST /ingest/shopify on your FastAPI endpoint.")
-    elif connector == "Amazon Seller Central":
-        st.markdown('<p class="section-title">Amazon SP-API Orders Schema</p>', unsafe_allow_html=True)
-        st.caption(f"Source: {AMAZON_MOCK_SCHEMA['source']} | Docs: {AMAZON_MOCK_SCHEMA['docs']}")
-        st.markdown("**Required fields:** " + ", ".join(f"`{f}`" for f in AMAZON_MOCK_SCHEMA["required_fields"]))
-        st.json(AMAZON_MOCK_SCHEMA["sample"])
-        st.info("Use Amazon SP-API GET /orders/v0/orders and pipe response to from_amazon_orders().")
-    elif connector == "WooCommerce":
-        st.markdown('<p class="section-title">WooCommerce REST API / CSV Export Schema</p>', unsafe_allow_html=True)
-        st.caption(f"Source: {WOOCOMMERCE_MOCK_SCHEMA['source']} | Docs: {WOOCOMMERCE_MOCK_SCHEMA['docs']}")
-        st.markdown("**Required fields:** " + ", ".join(f"`{f}`" for f in WOOCOMMERCE_MOCK_SCHEMA["required_fields"]))
+    elif connector == "WooCommerce Webhooks":
+        st.markdown("<p class='section-title'>WooCommerce Webhook Cryptographic Details</p>", unsafe_allow_html=True)
+        st.info(f"Endpoint: `POST {API_URL}/ingest/woocommerce?tenant_id={tenant_id}`")
+        st.info(f"Verification Secret (add to WooCommerce settings): `{tenant_sec}`")
         st.json(WOOCOMMERCE_MOCK_SCHEMA["sample"])
-        st.info("Export orders from WooCommerce admin or use REST API, then upload the CSV.")
+    elif connector == "Amazon Ingestion":
+        st.markdown("<p class='section-title'>Amazon Ingestion Cryptographic Details</p>", unsafe_allow_html=True)
+        st.info(f"Endpoint: `POST {API_URL}/ingest/amazon?tenant_id={tenant_id}`")
+        st.info(f"Verification Secret (add to Amazon config): `{tenant_sec}`")
+        st.json(AMAZON_MOCK_SCHEMA["sample"])
     elif connector == "Simulation Sandbox":
-        st.markdown('<div class="card card-amber"><strong>Simulation Sandbox</strong> - For demo and capability showcase ONLY. Use real connectors for production.</div>', unsafe_allow_html=True)
-        sc1,sc2,sc3 = st.columns(3)
-        sim_rows   = sc1.slider("Rows", 500, 10000, 3000, 500)
+        st.markdown('<div class="card card-amber"><strong>Simulation Sandbox</strong> - Generates synthetic macro-calibrated transaction logs.</div>', unsafe_allow_html=True)
+        sc1, sc2, sc3 = st.columns(3)
+        sim_rows = sc1.slider("Rows", 500, 10000, 3000, 500)
         sim_months = sc2.slider("Months of history", 6, 36, 24)
-        sim_seed   = sc3.number_input("Seed", value=42, step=1)
-        if st.button("Generate Simulation Dataset", type="primary"):
-            with st.spinner("Generating from live macro signals..."):
-                from data.loader import fetch_worldbank as _fwb, fetch_usd_inr as _fx, _WB_GDP as _GDP, _WB_CPI as _CPI, _clean as _cl, _engineer as _eng
-                _gdp = _fwb(_GDP); _cpi = _fwb(_CPI)
-                gdp_g = float(_gdp["value"].iloc[-1])/100 if not _gdp.empty else 0.07
-                cpi_r = float(_cpi["value"].iloc[-1])/100 if not _cpi.empty else 0.05
-                fx_s  = _fx()
-                sim_df = generate_simulation(int(sim_rows), int(sim_months), gdp_g, cpi_r, fx_s, int(sim_seed))
-                sim_df = _eng(_cl(sim_df))
-                st.session_state["df"] = sim_df
-                st.session_state["fname"] = "simulation"
-                st.success(f"Generated {len(sim_df):,} rows | GDP={gdp_g*100:.1f}% CPI={cpi_r*100:.1f}% FX=Rs{fx_s:.2f}")
-                st.rerun()
-    else:
-        st.markdown('<p class="section-title">Generic File Upload</p>', unsafe_allow_html=True)
-        st.markdown("Upload CSV, TSV, Excel, JSON or Parquet matching the standard schema.")
-    if df is not None:
-        st.markdown("---")
-        st.markdown('<p class="section-title">Current Dataset Validation</p>', unsafe_allow_html=True)
-        validation = validate_schema(df)
-        if validation["valid"]:
-            st.success(f"Schema valid: {validation['row_count']:,} rows, {validation['col_count']} columns")
-        else:
-            if validation["missing_cols"]: st.error(f"Missing columns: {', '.join(validation['missing_cols'])}")
-            if validation["type_errors"]:  st.warning(f"Type errors: {', '.join(validation['type_errors'])}")
-        for w in validation["warnings"]: st.warning(w)
-        src = df["source"].mode()[0] if "source" in df.columns else "upload"
-        st.info(f"Source: {src} | Rows: {len(df):,} | {df['order_date'].min().date()} to {df['order_date'].max().date()}")
+        sim_seed = sc3.number_input("Seed", value=42, step=1)
+        
+        if st.button("Generate & Ingest Simulation Dataset", type="primary"):
+            with st.spinner("Generating and posting to relational database..."):
+                # Call connector local function, convert to CSV, post to REST /orders/upload
+                sim_df = generate_simulation(int(sim_rows), int(sim_months), 0.07, 0.05, 84.0, int(sim_seed))
+                csv_buf = io.BytesIO()
+                sim_df.to_csv(csv_buf, index=False)
+                csv_buf.seek(0)
+                
+                files = {"file": ("simulation.csv", csv_buf.read())}
+                res = api_post("/orders/upload", files=files)
+                if res and "task_id" in res:
+                    wait_for_task(res["task_id"])
+                    st.rerun()
+
+
+# Stop tab rendering if database is empty
+if total_orders == 0:
+    st.stop()
+
+
+# --- TAB 1: EXECUTIVE SUMMARY ---
 
 with tabs[1]:
-    summary = executive_summary(dff, fx)
-    recs    = generate_recommendations(dff)
+    summary_data = api_get("/analytics/executive-summary")
+    if summary_data:
+        summary = summary_data.get("summary", {})
+        recs = summary_data.get("recommendations", [])
+        
+        # Headline card
+        st.markdown(f'<div class="headline-card">{summary.get("headline", "")}</div>', unsafe_allow_html=True)
+        
+        ex1, ex2, _ = st.columns([1, 1, 5])
+        with ex1:
+            st.markdown(
+                f'<a href="{API_URL}/analytics/export/excel" target="_blank" style="text-decoration:none;">'
+                f'<button style="background-color:#4f46e5;color:white;padding:8px 16px;border:none;border-radius:8px;font-weight:600;width:100%;cursor:pointer;">'
+                f'Export Excel</button></a>',
+                unsafe_allow_html=True
+            )
+        with ex2:
+            st.markdown(
+                f'<a href="{API_URL}/analytics/export/pdf" target="_blank" style="text-decoration:none;">'
+                f'<button style="border:1px solid #cbd5e1;color:#0f172a;padding:8px 16px;border-radius:8px;font-weight:500;width:100%;cursor:pointer;">'
+                f'Export PDF</button></a>',
+                unsafe_allow_html=True
+            )
+            
+        st.markdown("---")
+        cl, cr = st.columns(2)
+        
+        with cl:
+            st.markdown('<p class="section-title">Key Performance Indicators</p>', unsafe_allow_html=True)
+            kpi_df = pd.DataFrame(list(summary.get("kpis", {}).items()), columns=["Metric", "Value"])
+            st.dataframe(kpi_df, use_container_width=True, hide_index=True)
+            
+            st.markdown('<p class="section-title">Top Insights</p>', unsafe_allow_html=True)
+            for ins in summary.get("top_insights", []):
+                st.markdown(f'<div class="card card-blue">{ins}</div>', unsafe_allow_html=True)
+                
+        with cr:
+            st.markdown('<p class="section-title">Risks</p>', unsafe_allow_html=True)
+            for r in summary.get("risks", []):
+                cls = "card-red" if any(w in r for w in ["Warning", "above", "declined", "High", "risk"]) else "card-green"
+                st.markdown(f'<div class="card {cls}">{r}</div>', unsafe_allow_html=True)
+                
+            st.markdown('<p class="section-title">Opportunities</p>', unsafe_allow_html=True)
+            for o in summary.get("opportunities", []):
+                st.markdown(f'<div class="card card-green">{o}</div>', unsafe_allow_html=True)
+                
+        st.markdown("---")
+        st.markdown('<p class="section-title">Prioritised Recommendations</p>', unsafe_allow_html=True)
+        _p_colours = {
+            "High":   ("#dc2626", "#fef2f2"),
+            "Medium": ("#d97706", "#fffbeb"),
+            "Low":    ("#16a34a", "#f0fdf4"),
+        }
+        for rec in recs:
+            key = "High" if "High" in rec["priority"] else ("Medium" if "Medium" in rec["priority"] else "Low")
+            bc, bg = _p_colours[key]
+            st.markdown(
+                f'<div class="rec-card" style="border-left:5px solid {bc};background:{bg}">'
+                f'<div class="rec-title">{rec["priority"]} | {rec["category"]}</div>'
+                f'<div class="rec-action">{rec["action"]}</div>'
+                f'<div class="rec-meta">Impact: <strong>{rec["impact"]}</strong>'
+                f' &nbsp;|&nbsp; Effort: <strong>{rec["effort"]}</strong>'
+                f' &nbsp;|&nbsp; Metric: <strong>{rec["metric"]}</strong></div>'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
 
-    # Headline gradient card
-    st.markdown(
-        f'<div class="headline-card">{summary["headline"]}</div>',
-        unsafe_allow_html=True
-    )
 
-    ex1, ex2, _ = st.columns([1, 1, 5])
-    with ex1:
-        st.download_button(
-            "Export Excel", to_excel(dff, summary),
-            file_name=f"report_{pd.Timestamp.now().strftime('%Y%m%d')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True, type="primary",
-        )
-    with ex2:
-        st.download_button(
-            "Export PDF", to_pdf(summary, recs),
-            file_name=f"report_{pd.Timestamp.now().strftime('%Y%m%d')}.pdf",
-            mime="application/pdf", use_container_width=True,
-        )
+# --- TAB 2: PRICE OPTIMIZER ---
 
-    st.markdown("---")
-    cl, cr = st.columns(2)
-
-    with cl:
-        st.markdown('<p class="section-title">Key Performance Indicators</p>', unsafe_allow_html=True)
-        kpi_df = pd.DataFrame(list(summary["kpis"].items()), columns=["Metric", "Value"])
-        st.dataframe(kpi_df, use_container_width=True, hide_index=True)
-
-        st.markdown('<p class="section-title">Top Insights</p>', unsafe_allow_html=True)
-        for ins in summary["top_insights"]:
-            st.markdown(f'<div class="card card-blue">{ins}</div>', unsafe_allow_html=True)
-
-    with cr:
-        st.markdown('<p class="section-title">Risks</p>', unsafe_allow_html=True)
-        for r in summary["risks"]:
-            cls = "card-red" if any(w in r for w in ["Warning","above","declined","High","risk"]) else "card-green"
-            st.markdown(f'<div class="card {cls}">{r}</div>', unsafe_allow_html=True)
-
-        st.markdown('<p class="section-title">Opportunities</p>', unsafe_allow_html=True)
-        for o in summary["opportunities"]:
-            st.markdown(f'<div class="card card-green">{o}</div>', unsafe_allow_html=True)
-
-    st.markdown("---")
-    st.markdown('<p class="section-title">Prioritised Recommendations</p>', unsafe_allow_html=True)
-    _p_colours = {
-        "High":   ("#dc2626", "#fef2f2"),
-        "Medium": ("#d97706", "#fffbeb"),
-        "Low":    ("#16a34a", "#f0fdf4"),
-    }
-    for rec in recs:
-        key = "High" if "High" in rec["priority"] else ("Medium" if "Medium" in rec["priority"] else "Low")
-        bc, bg = _p_colours[key]
-        st.markdown(
-            f'<div class="rec-card" style="border-left:5px solid {bc};background:{bg}">'
-            f'<div class="rec-title">{rec["priority"]} | {rec["category"]}</div>'
-            f'<div class="rec-action">{rec["action"]}</div>'
-            f'<div class="rec-meta">Impact: <strong>{rec["impact"]}</strong>'
-            f' &nbsp;|&nbsp; Effort: <strong>{rec["effort"]}</strong>'
-            f' &nbsp;|&nbsp; Metric: <strong>{rec["metric"]}</strong></div>'
-            f'</div>',
-            unsafe_allow_html=True,
-        )
 with tabs[2]:
     st.subheader("Dynamic Price Optimizer")
-    st.caption("Computes revenue-maximising discount per category using price elasticity (Lerner index).")
-    with st.spinner("Running price optimisation..."):
-        price_recs = run_price_optimizer(dff)
-    if not price_recs.empty:
-        fig_p = plot_price_optimizer(price_recs)
-        if fig_p: st.plotly_chart(fig_p, use_container_width=True)
+    st.caption("Price elasticity of demand (Lerner Index) computed via backend statsmodels OLS.")
+    
+    price_data = api_get("/analytics/price-optimizer")
+    if not price_data:
+        st.info("No cached pricing recommendations available. Trigger pricing recalculation via the sidebar.")
+    else:
+        price_recs = pd.DataFrame(price_data)
+        
+        # Plot optimal discount bar chart
+        fig_p = go.Figure()
+        fig_p.add_trace(go.Bar(
+            name="Current Discount",
+            x=price_recs["category"],
+            y=price_recs["current_discount"],
+            marker_color="#94a3b8",
+        ))
+        fig_p.add_trace(go.Bar(
+            name="Optimal Discount",
+            x=price_recs["category"],
+            y=price_recs["optimal_discount"],
+            marker_color=["#22c55e" if d == "decrease" else "#ef4444" if d == "increase" else "#4f46e5"
+                          for d in price_recs["direction"]],
+        ))
+        fig_p.update_layout(
+            barmode="group",
+            title="Current vs Optimal Discount by Category",
+            xaxis_title="Category",
+            yaxis_title="Discount %",
+            template="plotly_white",
+            legend=dict(orientation="h", y=1.1),
+        )
+        st.plotly_chart(fig_p, use_container_width=True)
+        
         total_impact = price_recs["revenue_impact_pct"].sum()
         if total_impact > 0:
-            st.success(f"Applying all recommendations could improve revenue by **{total_impact:+.1f}%**")
-        elif total_impact < 0:
-            st.warning(f"Current discounts are above optimal  reducing them could recover **{abs(total_impact):.1f}%** revenue")
-        show = ["category","current_discount","optimal_discount","change","direction","elasticity","revenue_impact_pct","rationale"]
-        show = [c for c in show if c in price_recs.columns]
-        st.dataframe(price_recs[show], use_container_width=True, hide_index=True)
-        st.download_button("Export Price Recommendations",
-            price_recs.to_csv(index=False).encode(),
-            file_name="price_recommendations.csv", mime="text/csv")
-    else:
-        st.warning("Not enough data to compute elasticity. Upload a larger dataset (500+ rows recommended).")
+            st.success(f"Applying recommendations can yield **+{total_impact:.1f}%** revenue impact.")
+        st.dataframe(price_recs, use_container_width=True, hide_index=True)
 
-#  TAB 2: At-Risk Customers 
+
+# --- TAB 3: AT-RISK CUSTOMERS ---
+
 with tabs[3]:
     st.subheader("At-Risk Customer Automation")
-    st.caption("Churn risk scoring using recency, frequency, and monetary signals. Identifies high-value customers at risk of churning.")
-    top_n = st.slider("Customers to analyse", 20, 200, 50, 10)
-    with st.spinner("Scoring churn risk..."):
-        at_risk_df = generate_at_risk_alerts(dff, top_n=top_n)
-    if not at_risk_df.empty:
-        fig_r1, fig_r2 = plot_at_risk(at_risk_df)
-        c1,c2 = st.columns(2)
-        if fig_r1: c1.plotly_chart(fig_r1, use_container_width=True)
-        if fig_r2: c2.plotly_chart(fig_r2, use_container_width=True)
-        critical = at_risk_df[at_risk_df["risk_label"]=="Critical"]
-        if not critical.empty:
-            st.error(f"{len(critical)} critical high-value customers need immediate outreach")
-        show = ["customer_id","churn_risk_score","risk_label","value_tier","days_since_last_order","total_revenue","recommended_action"]
-        show = [c for c in show if c in at_risk_df.columns]
-        st.dataframe(at_risk_df[show].head(50), use_container_width=True, hide_index=True)
-        st.download_button("Export At-Risk List",
-            at_risk_df[show].to_csv(index=False).encode(),
-            file_name="at_risk_customers.csv", mime="text/csv")
+    st.caption("RFM Churn scoring database cache output.")
+    
+    at_risk_data = api_get("/analytics/at-risk")
+    if not at_risk_data:
+        st.info("No cached customer risk metrics available. Trigger CLV & Churn scoring via the sidebar.")
     else:
-        st.warning("Not enough customer data for churn scoring.")
+        at_risk_df = pd.DataFrame(at_risk_data)
+        
+        c1, c2 = st.columns(2)
+        # Churn score distribution
+        c1.plotly_chart(px.histogram(
+            at_risk_df, x="churn_risk_score", color="risk_label",
+            title="Churn Risk Score Distribution", template="plotly_white"
+        ), use_container_width=True)
+        
+        # Risk label share
+        c2.plotly_chart(px.pie(
+            at_risk_df, names="risk_label", values="total_revenue",
+            title="Revenue Exposure by Churn Risk", hole=0.4, template="plotly_white"
+        ), use_container_width=True)
+        
+        st.dataframe(at_risk_df, use_container_width=True, hide_index=True)
 
-#  TAB 3: Model Drift 
+
+# --- TAB 4: MODEL DRIFT ---
+
 with tabs[4]:
     st.subheader("Model Drift Monitoring")
-    st.caption("Detects feature distribution shift (PSI) and prediction performance degradation between reference and current windows.")
-    c1,c2 = st.columns(2)
-    ref_m = c1.slider("Reference window (months)", 3, 12, 6)
-    cur_m = c2.slider("Current window (months)",   1, 6,  3)
-    with st.spinner("Computing drift..."):
-        drift_df   = compute_drift(dff, reference_months=ref_m, current_months=cur_m)
-        pred_drift = compute_prediction_drift(dff, reference_months=ref_m, current_months=cur_m)
-    if not drift_df.empty:
-        fig_d = plot_drift(drift_df)
-        if fig_d: st.plotly_chart(fig_d, use_container_width=True)
-        drifted = drift_df[drift_df["drift_detected"]]
-        if not drifted.empty:
-            st.warning(f"{len(drifted)} features show significant drift  model retraining recommended.")
+    st.caption("Population Stability Index (PSI) values computed asynchronously.")
+    
+    drift_data = api_get("/analytics/drift")
+    if not drift_data or drift_data.get("status") == "not_computed":
+        st.info("No data drift monitoring reports found. Trigger drift recalculation via sidebar.")
+    else:
+        st.markdown("**Drift Performance Parameters**")
+        pm1, pm2, pm3 = st.columns(3)
+        pm1.metric("Features Drifted", drift_data.get("features_drifted", 0))
+        pm2.metric("Max PSI", round(drift_data.get("max_psi", 0.0), 3))
+        pm3.metric("R2 prediction drop", f"{drift_data.get('pred_r2_drop', 0.0):.3f}")
+        
+        if drift_data.get("drift_alert"):
+            st.error("Significant data distribution shift detected. Model retraining is highly recommended.")
         else:
-            st.success("No significant feature drift detected in current window.")
-        st.dataframe(drift_df, use_container_width=True, hide_index=True)
-    if pred_drift:
-        st.markdown("**Prediction Performance**")
-        pm1,pm2,pm3,pm4 = st.columns(4)
-        pm1.metric("Reference R2",  str(pred_drift.get("ref_r2","N/A")))
-        pm2.metric("Current R2",    str(pred_drift.get("cur_r2","N/A")),
-                   delta=f"{-pred_drift.get('r2_drop',0):+.3f}" if pred_drift.get("r2_drop") else None,
-                   delta_color="inverse")
-        pm3.metric("Reference MAE", f"Rs{pred_drift.get('ref_mae',0):,.0f}")
-        pm4.metric("Current MAE",   f"Rs{pred_drift.get('cur_mae',0):,.0f}")
-        if pred_drift.get("drift_alert"):
-            st.error("Model performance has degraded significantly. Retrain with recent data.")
-    elif drift_df.empty:
-        st.info("Not enough data for drift analysis. Need at least 9 months of data.")
+            st.success("Feature metrics are within normal drift bounds.")
 
-#  TAB 4: Revenue Trends 
+
+# --- TAB 5: REVENUE TRENDS ---
+
 with tabs[5]:
     st.subheader("Revenue Trends")
-    m = dff.groupby("year_month")["revenue"].sum().reset_index()
-    st.plotly_chart(px.line(m,x="year_month",y="revenue",markers=True,
-        title="Total Monthly Revenue",labels={"revenue":"Revenue (Rs)","year_month":"Month"},
-        template="plotly_white",color_discrete_sequence=["#4f46e5"]),use_container_width=True)
-    c1,c2 = st.columns(2)
-    c1.plotly_chart(px.line(dff.groupby("year_month")["revenue"].mean().reset_index(),
-        x="year_month",y="revenue",markers=True,title="Avg Order Value",
-        labels={"revenue":"AOV (Rs)"},template="plotly_white",color_discrete_sequence=["#22c55e"]),use_container_width=True)
-    c2.plotly_chart(px.line(dff.groupby("year_month")["discount_percent"].mean().reset_index(),
-        x="year_month",y="discount_percent",markers=True,title="Avg Discount %",
-        template="plotly_white",color_discrete_sequence=["#ef4444"]),use_container_width=True)
-    st.plotly_chart(px.line(dff.groupby(["year_month","zone"])["revenue"].sum().reset_index(),
-        x="year_month",y="revenue",color="zone",markers=True,title="Revenue by Zone",
-        template="plotly_white"),use_container_width=True)
-    st.plotly_chart(px.line(dff.groupby(["year_month","brand_type"])["revenue"].sum().reset_index(),
-        x="year_month",y="revenue",color="brand_type",markers=True,title="Revenue: Mass vs Premium",
-        template="plotly_white"),use_container_width=True)
+    trends = api_get("/analytics/charts/revenue-trends")
+    if trends:
+        m = pd.DataFrame(trends["monthly_revenue"])
+        avg_disc = pd.DataFrame(trends["monthly_discount"])
+        zone_rev = pd.DataFrame(trends["zone_revenue"])
+        brand_rev = pd.DataFrame(trends["brand_revenue"])
+        
+        st.plotly_chart(px.line(
+            m, x="year_month", y="revenue", markers=True,
+            title="Total Monthly Revenue", labels={"revenue": "Revenue (Rs)"},
+            template="plotly_white", color_discrete_sequence=["#4f46e5"]
+        ), use_container_width=True)
+        
+        c1, c2 = st.columns(2)
+        c1.plotly_chart(px.line(
+            avg_disc, x="year_month", y="discount_percent", markers=True,
+            title="Average Discount Trend", template="plotly_white", color_discrete_sequence=["#ef4444"]
+        ), use_container_width=True)
+        
+        c2.plotly_chart(px.line(
+            zone_rev, x="year_month", y="revenue", color="zone", markers=True,
+            title="Revenue Share by Zone", template="plotly_white"
+        ), use_container_width=True)
 
-#  TAB 5: Categories 
+
+# --- TAB 6: CATEGORIES ---
+
 with tabs[6]:
     st.subheader("Category & Brand Analysis")
-    c1,c2 = st.columns(2)
-    c1.plotly_chart(px.pie(dff.groupby("category")["revenue"].sum().reset_index(),
-        names="category",values="revenue",title="Revenue by Category",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    c2.plotly_chart(px.pie(dff.groupby("brand_type")["revenue"].sum().reset_index(),
-        names="brand_type",values="revenue",title="Mass vs Premium",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    metric = st.selectbox("Metric",["revenue","final_price","units_sold","discount_percent"])
-    st.plotly_chart(px.bar(dff.groupby("category")[metric].mean().reset_index().sort_values(metric,ascending=False),
-        x="category",y=metric,color="category",title=f"Avg {metric} by Category",
-        template="plotly_white",color_discrete_sequence=px.colors.qualitative.Set2),use_container_width=True)
-    st.plotly_chart(px.bar(dff.groupby(["year_month","sales_event"])["revenue"].sum().reset_index(),
-        x="year_month",y="revenue",color="sales_event",title="Festival vs Normal Revenue",
-        template="plotly_white",barmode="group"),use_container_width=True)
+    cats_data = api_get("/analytics/charts/category-analysis")
+    if cats_data:
+        cat_df = pd.DataFrame(cats_data["category_revenue"])
+        brand_df = pd.DataFrame(cats_data["brand_revenue"])
+        event_df = pd.DataFrame(cats_data["event_revenue"])
+        
+        c1, c2 = st.columns(2)
+        c1.plotly_chart(px.pie(
+            cat_df, names="category", values="revenue", title="Revenue by Category",
+            hole=0.4, template="plotly_white"
+        ), use_container_width=True)
+        
+        c2.plotly_chart(px.pie(
+            brand_df, names="brand_type", values="revenue", title="Mass vs Premium Mix",
+            hole=0.4, template="plotly_white"
+        ), use_container_width=True)
+        
+        st.plotly_chart(px.bar(
+            event_df, x="year_month", y="revenue", color="sales_event",
+            title="Festival vs Normal Revenue", template="plotly_white", barmode="group"
+        ), use_container_width=True)
 
-#  TAB 6: Regional 
+
+# --- TAB 7: REGIONAL ---
+
 with tabs[7]:
     st.subheader("Regional Analysis")
-    st.plotly_chart(px.bar(dff.groupby("state")["revenue"].sum().nlargest(15).reset_index(),
-        x="revenue",y="state",orientation="h",title="Top 15 States by Revenue",
-        template="plotly_white",color="revenue",color_continuous_scale="Blues"),use_container_width=True)
-    c1,c2 = st.columns(2)
-    c1.plotly_chart(px.pie(dff.groupby("zone")["revenue"].sum().reset_index(),
-        names="zone",values="revenue",title="Revenue by Zone",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    c2.plotly_chart(px.bar(dff.groupby("zone")["units_sold"].mean().reset_index(),
-        x="zone",y="units_sold",color="zone",title="Avg Units by Zone",
-        template="plotly_white"),use_container_width=True)
+    reg_data = api_get("/analytics/charts/regional-analysis")
+    if reg_data:
+        state_df = pd.DataFrame(reg_data["state_revenue"])
+        zone_df = pd.DataFrame(reg_data["zone_revenue"])
+        units_df = pd.DataFrame(reg_data["zone_units"])
+        
+        st.plotly_chart(px.bar(
+            state_df, x="revenue", y="state", orientation="h",
+            title="Top 15 States by Revenue", template="plotly_white",
+            color="revenue", color_continuous_scale="Blues"
+        ), use_container_width=True)
 
-#  TAB 7: Inventory 
+
+# --- TAB 8: INVENTORY ---
+
 with tabs[8]:
     st.subheader("Inventory Alert System")
-    from modules.inventory_alerts import compute_alerts
-    alerts = compute_alerts(dff)
-    cmap = {
-        "CRITICAL - Reorder Now":    "#ef4444",
-        "HIGH - Monitor Closely":    "#f97316",
-        "CLEARANCE - Excess Stock":  "#eab308",
-        "SLOW MOVER - Review Listing":"#3b82f6",
-        "HEALTHY":                   "#22c55e",
-    }
-    st.plotly_chart(px.scatter(alerts,x="avg_discount",y="avg_units_sold",color="alert_level",
-        size="high_pressure_pct",hover_data=["category","zone","recommendation"],
-        color_discrete_map=cmap,title="Inventory Alert Dashboard",template="plotly_white"),use_container_width=True)
-    af = st.multiselect("Filter alerts",list(cmap.keys()),default=list(cmap.keys()))
-    st.dataframe(alerts[alerts["alert_level"].isin(af)]
-        [["category","zone","avg_units_sold","avg_discount","alert_level","recommendation"]],
-        use_container_width=True,hide_index=True)
+    inv_data = api_get("/analytics/charts/inventory-alerts")
+    if inv_data:
+        alerts = pd.DataFrame(inv_data)
+        cmap = {
+            "CRITICAL - Reorder Now":    "#ef4444",
+            "HIGH - Monitor Closely":    "#f97316",
+            "CLEARANCE - Excess Stock":  "#eab308",
+            "SLOW MOVER - Review Listing":"#3b82f6",
+            "HEALTHY":                   "#22c55e",
+        }
+        st.plotly_chart(px.scatter(
+            alerts, x="avg_discount", y="avg_units_sold", color="alert_level",
+            size="high_pressure_pct", hover_data=["category", "zone", "recommendation"],
+            color_discrete_map=cmap, title="Inventory Alert Scatter Map", template="plotly_white"
+        ), use_container_width=True)
+        
+        st.dataframe(alerts, use_container_width=True, hide_index=True)
 
-#  TAB 8: CLV 
+
+# --- TAB 9: CLV ---
+
 with tabs[9]:
-    st.subheader("Customer Lifetime Value")
-    from modules.clv import compute_clv
-    # Try Supabase cache first
-    clv_df = load_clv_cache(dff)
-    if clv_df is None:
-        with st.spinner("Computing CLV... (result will be cached)"):
-            clv_df = compute_clv(dff)
-            cache_clv(dff, clv_df)
-        st.caption("CLV computed fresh and cached to Supabase (24h TTL).")
-    else:
-        st.caption("CLV loaded from Supabase cache (< 24h old).")
-    c1,c2 = st.columns(2)
-    c1.plotly_chart(px.histogram(clv_df,x="clv",color="clv_tier",nbins=50,
-        title="CLV Distribution",template="plotly_white",marginal="box"),use_container_width=True)
-    c2.plotly_chart(px.pie(clv_df.groupby("clv_tier")["clv"].sum().reset_index(),
-        names="clv_tier",values="clv",title="CLV Share by Tier",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    st.plotly_chart(px.scatter(clv_df,x="frequency",y="clv",color="clv_tier",
-        opacity=0.6,size="monetary",title="Frequency vs CLV",template="plotly_white"),use_container_width=True)
-    st.dataframe(clv_df.groupby("clv_tier")["clv"].agg(count="count",mean_clv="mean",total_clv="sum").round(2),
-        use_container_width=True)
+    st.subheader("Customer Lifetime Value (BG/NBD)")
+    clv_data = api_get("/analytics/clv")
+    if not clv_data or isinstance(clv_data, dict) and clv_data.get("status") == "not_computed":
+        st.info("No CLV calculations found. Trigger CLV & Churn via sidebar.")
+    elif isinstance(clv_data, list):
+        clv_df = pd.DataFrame(clv_data)
+        c1, c2 = st.columns(2)
+        c1.plotly_chart(px.histogram(
+            clv_df, x="clv", color="clv_tier", title="CLV Histogram Distribution",
+            template="plotly_white"
+        ), use_container_width=True)
+        
+        c2.plotly_chart(px.scatter(
+            clv_df, x="frequency", y="clv", color="clv_tier", size="monetary",
+            title="Frequency vs CLV", template="plotly_white"
+        ), use_container_width=True)
 
-#  TAB 9: Anomalies 
+
+# --- TAB 10: ANOMALIES ---
+
 with tabs[10]:
-    st.subheader("Anomaly Detection")
-    from modules.anomaly import anomaly_report
-    # Try Supabase cache first (weekly TTL)
-    anom_cached = load_anomaly_cache(dff)
-    if anom_cached is not None:
-        st.caption("Anomaly scores loaded from Supabase cache (< 7 days old).")
-        anom = anomaly_report(dff)  # still run full for scatter plots
-        cache_note = "cached"
-    else:
-        with st.spinner("Detecting anomalies... (scores will be cached)"):
-            anom = anomaly_report(dff)
-            cache_anomaly_scores(dff, anom)
-        cache_note = "fresh"
-        st.caption("Anomaly scores computed fresh and cached to Supabase (7-day TTL).")
-    c1,c2 = st.columns(2)
-    c1.plotly_chart(px.scatter(anom,x="log_units_sold",y="log_revenue",color="confirmed_anomaly",
-        color_discrete_map={True:"#ef4444",False:"#94a3b8"},opacity=0.5,
-        title="log(Units) vs log(Revenue)",hover_data=["category","zone","discount_percent"],
-        template="plotly_white"),use_container_width=True)
-    c2.plotly_chart(px.scatter(anom,x="discount_percent",y="log_final_price",color="confirmed_anomaly",
-        color_discrete_map={True:"#ef4444",False:"#e2e8f0"},opacity=0.55,
-        title="Discount % vs log(Final Price)",hover_data=["category","zone"],
-        template="plotly_white"),use_container_width=True)
-    n = anom["confirmed_anomaly"].sum()
-    st.info(f"Confirmed anomalies (>=2 detectors): **{n:,}** ({n/len(anom):.2%}) | Source: {cache_note}")
-    st.plotly_chart(px.bar(
-        anom[anom["confirmed_anomaly"]].groupby("category").size().reset_index(name="count").sort_values("count",ascending=False),
-        x="category",y="count",color="category",title="Anomalies by Category",template="plotly_white"),
-        use_container_width=True)
+    st.subheader("Anomaly Detection (Isolation Forest)")
+    anom_data = api_get("/analytics/anomalies")
+    if not anom_data or isinstance(anom_data, dict) and anom_data.get("status") == "not_computed":
+        st.info("No anomaly computations found. Trigger anomalies calculations via the sidebar.")
+    elif isinstance(anom_data, list):
+        anom_df = pd.DataFrame(anom_data)
+        st.plotly_chart(px.scatter(
+            anom_df, x="log_units_sold", y="log_revenue", color="confirmed_anomaly",
+            color_discrete_map={True: "#ef4444", False: "#94a3b8"}, opacity=0.5,
+            title="log(Units Sold) vs log(Revenue)", template="plotly_white"
+        ), use_container_width=True)
 
-#  TAB 10: Cohort 
+
+# --- TAB 11: COHORT ---
+
 with tabs[11]:
-    st.subheader("Cohort Analysis")
-    from modules.cohort import build_cohort_table
-    c1,c2 = st.columns(2)
-    pivot = build_cohort_table(dff,metric="count")
-    ret = (pivot.div(pivot[0],axis=0)*100).round(1)
-    c1.plotly_chart(px.imshow(ret,color_continuous_scale="Blues",title="Retention Rate (%) - Orders",
-        labels={"x":"Months since first purchase","y":"Cohort","color":"Retention %"},
-        text_auto=".0f",template="plotly_white"),use_container_width=True)
-    pivot_r = build_cohort_table(dff,metric="revenue")
-    ret_r = (pivot_r.div(pivot_r[0],axis=0)*100).round(1)
-    c2.plotly_chart(px.imshow(ret_r,color_continuous_scale="Greens",title="Revenue Retention (%)",
-        labels={"x":"Months since first purchase","y":"Cohort","color":"Retention %"},
-        text_auto=".0f",template="plotly_white"),use_container_width=True)
+    st.subheader("Cohort Analysis Matrix")
+    cohort_data = api_get("/analytics/charts/cohort-analysis")
+    if cohort_data:
+        c1, c2 = st.columns(2)
+        
+        cc = cohort_data["cohort_counts"]
+        cc_df = pd.DataFrame(cc["values"], index=cc["index"], columns=cc["columns"])
+        # retention pct
+        cc_pct = (cc_df.div(cc_df.iloc[:, 0], axis=0) * 100).round(1)
+        c1.plotly_chart(px.imshow(
+            cc_pct, color_continuous_scale="Blues", title="Retention Rate (%) - Orders",
+            text_auto=".0f", template="plotly_white"
+        ), use_container_width=True)
+        
+        cr = cohort_data["cohort_revenue"]
+        cr_df = pd.DataFrame(cr["values"], index=cr["index"], columns=cr["columns"])
+        cr_pct = (cr_df.div(cr_df.iloc[:, 0], axis=0) * 100).round(1)
+        c2.plotly_chart(px.imshow(
+            cr_pct, color_continuous_scale="Greens", title="Revenue Retention Rate (%)",
+            text_auto=".0f", template="plotly_white"
+        ), use_container_width=True)
 
-#  TAB 11: Pareto 
+
+# --- TAB 12: PARETO ---
+
 with tabs[12]:
-    st.subheader("Pareto & Concentration")
-    agg = dff.groupby("category")["revenue"].sum().sort_values(ascending=False).reset_index()
-    agg["cum_pct"] = agg["revenue"].cumsum()/agg["revenue"].sum()*100
-    fig = make_subplots(specs=[[{"secondary_y":True}]])
-    fig.add_trace(go.Bar(x=agg["category"],y=agg["revenue"],name="Revenue",marker_color="#4f46e5"),secondary_y=False)
-    fig.add_trace(go.Scatter(x=agg["category"],y=agg["cum_pct"],mode="lines+markers",
-        name="Cumulative %",line=dict(color="#ef4444",width=2.5)),secondary_y=True)
-    fig.add_hline(y=80,line_dash="dash",line_color="#94a3b8",annotation_text="80%",secondary_y=True)
-    fig.update_layout(title="Pareto - Revenue by Category (80/20 Rule)",template="plotly_white")
-    fig.update_yaxes(title_text="Revenue (Rs)",secondary_y=False)
-    fig.update_yaxes(title_text="Cumulative %",secondary_y=True)
-    st.plotly_chart(fig,use_container_width=True)
-    st.plotly_chart(px.sunburst(
-        dff.groupby(["category","zone","brand_type"])["revenue"].sum().reset_index(),
-        path=["category","zone","brand_type"],values="revenue",
-        title="Revenue Sunburst - Category > Zone > Brand",template="plotly_white",
-        color="revenue",color_continuous_scale="Blues"),use_container_width=True)
-    vals = np.sort(dff["revenue"].dropna().values)[::-1]
-    cum  = np.cumsum(vals)/vals.sum()
-    x    = np.linspace(0,1,len(cum))
-    gini = round(1-2*np.trapezoid(cum,x),3)
-    fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=[0,1],y=[0,1],mode="lines",line=dict(dash="dash",color="#94a3b8"),name="Perfect equality"))
-    fig2.add_trace(go.Scatter(x=x,y=cum,mode="lines",fill="tozeroy",fillcolor="rgba(79,70,229,.10)",
-        line=dict(color="#4f46e5",width=2.5),name=f"Lorenz (Gini={gini})"))
-    fig2.update_layout(title=f"Lorenz Curve - Revenue Concentration (Gini={gini})",
-        xaxis_title="Cumulative share of orders",yaxis_title="Cumulative share of revenue",
-        template="plotly_white")
-    st.plotly_chart(fig2,use_container_width=True)
+    st.subheader("Pareto Analysis & Lorenz Curve")
+    pareto_data = api_get("/analytics/charts/pareto-analysis")
+    if pareto_data:
+        agg = pd.DataFrame(pareto_data["pareto_categories"])
+        lorenz = pd.DataFrame(pareto_data["lorenz_curve"])
+        gini = pareto_data.get("lorenz_gini", 0.0)
+        
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_trace(go.Bar(x=agg["category"], y=agg["revenue"], name="Revenue", marker_color="#4f46e5"), secondary_y=False)
+        fig.add_trace(go.Scatter(x=agg["category"], y=agg["cum_pct"], mode="lines+markers", name="Cumulative %", line=dict(color="#ef4444", width=2.5)), secondary_y=True)
+        fig.update_layout(title="Pareto Category Contribution", template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        fig2 = go.Figure()
+        fig2.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", line=dict(dash="dash", color="#94a3b8"), name="Equality Line"))
+        fig2.add_trace(go.Scatter(x=lorenz["x"], y=lorenz["y"], mode="lines", fill="tozeroy", name=f"Lorenz (Gini={gini})", line=dict(color="#4f46e5", width=2.5)))
+        fig2.update_layout(title=f"Lorenz Curve (Gini Coefficient = {gini})", template="plotly_white")
+        st.plotly_chart(fig2, use_container_width=True)
 
 
-# TAB 13: Operational Actions
+# --- TAB 13: OPERATIONAL ACTIONS ---
+
 with tabs[13]:
     st.subheader("Operational Actions")
-    st.caption("Approve or dismiss model recommendations. Actions logged to Supabase for audit trail.")
-    if not cfg.SUPABASE_READY:
-        st.warning("Supabase not configured. Add SUPABASE_URL + SUPABASE_ANON_KEY to secrets for persistence.")
+    st.caption("Approve pricing recommendations or audit past worker logs.")
+    
     act1, act2 = st.columns(2)
     with act1:
         st.markdown('<p class="section-title">Approve Price Optimisation</p>', unsafe_allow_html=True)
-        from modules.price_optimizer import run_price_optimizer as _rpo
-        with st.spinner("Loading recommendations..."):
-            _price_recs = _rpo(dff)
-        if not _price_recs.empty:
-            st.dataframe(_price_recs[["category","current_discount","optimal_discount","direction","revenue_impact_pct"]].head(10), use_container_width=True, hide_index=True)
-            if st.button("Approve All Price Adjustments", type="primary", use_container_width=True, key="approve_price"):
-                payload = _price_recs[["category","current_discount","optimal_discount","direction","revenue_impact_pct"]].to_dict(orient="records")
-                ok = log_action("price_approval", {"recommendations": payload, "count": len(payload)}, status="approved")
-                st.success(f"Approved {len(payload)} adjustments." + (" Logged to Supabase." if ok else " (Supabase not configured)"))
-            if st.button("Dismiss", use_container_width=True, key="dismiss_price"):
-                log_action("price_approval", {"count": len(_price_recs)}, status="dismissed")
-                st.info("Dismissed.")
+        recs = api_get("/analytics/price-optimizer")
+        if recs:
+            st.dataframe(pd.DataFrame(recs)[["category", "current_discount", "optimal_discount", "direction", "revenue_impact_pct"]].head(10), use_container_width=True, hide_index=True)
+            if st.button("Approve All Price Adjustments", type="primary", use_container_width=True):
+                api_post("/operational-actions", json_data={
+                    "action_type": "price_approval",
+                    "payload": {"count": len(recs), "items": recs},
+                    "status": "approved"
+                })
+                st.success("Pricing adjustments logged as approved.")
+        else:
+            st.info("No pricing adjustments pending approval.")
+            
     with act2:
         st.markdown('<p class="section-title">Export At-Risk Cohort</p>', unsafe_allow_html=True)
-        from modules.at_risk import generate_at_risk_alerts as _gara
-        with st.spinner("Scoring churn risk..."):
-            _at_risk_ops = _gara(dff, top_n=100)
-        if not _at_risk_ops.empty:
-            crit = int((_at_risk_ops["risk_label"]=="Critical").sum())
-            high = int((_at_risk_ops["risk_label"]=="High").sum())
-            st.metric("Critical customers", crit)
-            st.metric("High-risk customers", high)
-            _exp_cols = [c for c in ["customer_id","churn_risk_score","risk_label","value_tier","total_revenue","recommended_action"] if c in _at_risk_ops.columns]
-            st.download_button("Export CSV (Klaviyo / SendGrid import)", _at_risk_ops[_exp_cols].to_csv(index=False).encode(),
-                file_name=f"at_risk_{pd.Timestamp.now().strftime('%Y%m%d')}.csv", mime="text/csv", use_container_width=True, type="primary", key="export_atrisk")
-            if st.button("Log Export to Supabase", use_container_width=True, key="log_export"):
-                ok = log_action("at_risk_export", {"exported": len(_at_risk_ops), "critical": crit, "high": high}, status="exported")
-                st.success("Logged." if ok else "Supabase not configured.")
+        alerts = api_get("/analytics/at-risk")
+        if alerts:
+            st.metric("Total high-risk customers", len(alerts))
+            if st.button("Log Export to Audits", use_container_width=True):
+                api_post("/operational-actions", json_data={
+                    "action_type": "at_risk_export",
+                    "payload": {"exported_count": len(alerts)},
+                    "status": "exported"
+                })
+                st.success("Export event logged successfully.")
+        else:
+            st.info("No at-risk cohort alerts generated.")
+            
     st.markdown("---")
     st.markdown('<p class="section-title">Pending Actions Log</p>', unsafe_allow_html=True)
-    _pending = get_pending_actions()
-    if _pending:
-        st.dataframe(pd.DataFrame(_pending)[["id","action_type","status","source","created_at"]], use_container_width=True, hide_index=True)
-        _aid = st.number_input("Action ID to update", min_value=1, step=1)
-        _ns  = st.selectbox("New status", ["approved","dismissed","exported"])
+    pending = api_get("/operational-actions/pending")
+    if pending:
+        pending_df = pd.DataFrame(pending)
+        st.dataframe(pending_df[["id", "action_type", "status", "source", "created_at"]], use_container_width=True, hide_index=True)
+        
+        col_id, col_stat = st.columns(2)
+        aid = col_id.number_input("Action ID to update", min_value=1, step=1)
+        ns = col_stat.selectbox("New status", ["approved", "dismissed", "exported"])
         if st.button("Update Status"):
-            update_action_status(int(_aid), _ns); st.rerun()
+            api_post("/operational-actions/update", json_data={"action_id": int(aid), "status": ns})
+            st.success(f"Status of action {aid} updated to {ns}")
+            st.rerun()
     else:
-        st.info("No pending actions. Configure Supabase or approve/dismiss recommendations above.")
+        st.info("No pending actions in operational logs.")
 
-#  FOOTER 
-st.markdown("---")
-st.caption(
-    f"{cfg.APP_NAME} v{cfg.APP_VERSION}  |  "
-    "World Bank Open Data (CC BY 4.0)  |  "
-    "fawazahmed0/exchange-api (CC0)  |  "
-    "pytrends/Google Trends (Apache 2.0)  |  "
-    f"Kaggle: {cfg.KAGGLE_URL}"
-)
+
+# --- TAB 14: OBSERVABILITY (OPENTELEMETRY) ---
+
+with tabs[14]:
+    st.subheader("System Observability (OpenTelemetry)")
+    st.caption("Real-time telemetry retrieved from FastAPI instrumentation.")
+    
+    telemetry = api_get("/analytics/telemetry")
+    if telemetry:
+        # KPI metrics
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("API Requests Recorded", f"{telemetry.get('requests_total', 0)} / 1000")
+        m2.metric("Average Response Latency", f"{telemetry.get('avg_latency_ms', 0.0):.1f} ms")
+        m3.metric("Active Celery Worker Status", telemetry.get("celery", {}).get("status", "unknown").upper())
+        m4.metric("Active Worker Tasks", telemetry.get("celery", {}).get("active_tasks", 0))
+        
+        st.markdown("---")
+        
+        # Requests breakdown
+        paths = telemetry.get("path_distribution", {})
+        if paths:
+            fig_tel = px.bar(
+                x=list(paths.keys()), y=list(paths.values()),
+                title="API Request Count by Route", labels={"x": "Route Path", "y": "Requests Count"},
+                template="plotly_white"
+            )
+            st.plotly_chart(fig_tel, use_container_width=True)
+    else:
+        st.error("Failed to query OpenTelemetry endpoints.")

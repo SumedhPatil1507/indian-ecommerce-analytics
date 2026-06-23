@@ -1,4 +1,4 @@
-# IndiaCommerce Analytics
+# IndiaCommerce Analytics (v5.0)
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/)
 
@@ -6,98 +6,19 @@
 **GitHub:** https://github.com/SumedhPatil1507/indian-ecommerce-analytics
 **Dataset:** https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth
 
-Production-grade e-commerce analytics platform with live macro data, multi-source connectors, ML-powered insights, and operational action workflows.
+Production-grade, multi-tenant e-commerce analytics platform with a stateless visual frontend, cryptographic webhook protection, relational PostgreSQL storage (isolated via Row-Level Security), distributed Celery task worker, and OpenTelemetry request instrumentation.
 
 ---
 
-## What's Inside
+## Architecture Highlights
 
-### Data Connector Matrix
-Connect any e-commerce platform to the analytics engine:
-
-| Connector | Source | Schema |
-|---|---|---|
-| Shopify | order/create webhook | `from_shopify_webhook(payload)` |
-| Amazon Seller Central | SP-API Orders v0 | `from_amazon_orders(payload)` |
-| WooCommerce | REST API / DB dump | `from_woocommerce(payload)` |
-| Generic File | CSV, TSV, Excel, JSON, Parquet | `load_any(file, filename)` |
-| Simulation Sandbox | Live macro-calibrated synthetic data | `generate_simulation(...)` |
-
-### Analytics Tabs (14 total)
-
-| Tab | What it does |
-|---|---|
-| Data Connector Matrix | Connect Shopify/Amazon/WooCommerce, validate schema, run Simulation Sandbox |
-| Executive Summary | Auto-written narrative, KPIs, risks, opportunities, PDF + Excel export |
-| Price Optimizer | Lerner-index optimal discount per category, approve/dismiss with Supabase logging |
-| At-Risk Customers | RFM churn scoring, export cohort to CSV for Klaviyo/SendGrid |
-| Model Drift | PSI feature drift + R2 prediction degradation monitoring |
-| Revenue Trends | Monthly revenue, AOV, discount trend, zone + brand breakdown |
-| Categories | Revenue mix, festival vs normal, metric selector |
-| Regional | Top 15 states, zone pie, units by zone |
-| Inventory | Alert system with scatter dashboard + filterable table |
-| CLV | BG/NBD CLV tiers, distribution, frequency scatter |
-| Anomalies | Isolation Forest + DBSCAN + Z-score, anomaly by category |
-| Cohort | Retention rate + revenue retention heatmaps |
-| Pareto | 80/20 chart, sunburst, Lorenz curve + Gini coefficient |
-| Operational Actions | Approve price changes, export at-risk cohort, view Supabase action log |
-
-### Live Data Sources
-
-| Source | Data | License |
-|---|---|---|
-| [World Bank Open Data](https://data.worldbank.org/) | India GDP growth + CPI inflation | CC BY 4.0 |
-| [fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api) | Live USD/INR rate | CC0 |
-| [Google Trends via pytrends](https://github.com/GeneralMills/pytrends) | E-commerce search interest | Apache 2.0 |
-
-### Supabase Operational Persistence
-
-When configured, Supabase stores:
-- `operational_actions` - approved price changes, at-risk exports, drift alerts
-- `clv_cache` - cached CLV tier results (24h TTL)
-- `anomaly_cache` - cached weekly anomaly scores (7-day TTL)
-- `model_results` - cached heavy model outputs (Prophet, SARIMA)
-- `price_recommendations` - price optimizer output
-- `at_risk_alerts` - churn risk scores
+1. **Stateless Visual Dashboard**: The Streamlit application in `dashboard/app.py` is entirely decoupled from business logic and acts as a stateless visual browser. It authenticates users and loads JSON payloads from FastAPI.
+2. **Multi-Tenant Row-Level Security (RLS)**: Transaction logs are persisted in a relational `orders` table in Supabase. PostgreSQL RLS policies automatically restrict access using the tenant's auth JWT.
+3. **Cryptographically Protected Webhooks**: Ingestion routes for Shopify, WooCommerce, and Amazon require signature verification (using SHA256 HMAC) before queueing requests.
+4. **Distributed Task Queue**: Heavy analytics calculations (CLV, Price Optimisation OLS, Anomaly Forest, Drift PSI) and large order uploads run asynchronously on a background Celery worker backed by Redis.
+5. **OpenTelemetry Telemetry**: Requests, latencies, error states, and worker tasks are instrumented using the OpenTelemetry API and rendered inside the *Observability (OpenTelemetry)* UI tab.
 
 ---
-
-## Quick Start
-
-```bash
-git clone https://github.com/SumedhPatil1507/indian-ecommerce-analytics
-cd ecommerce-analytics
-bash setup_env.sh
-source .venv/bin/activate
-
-# Run dashboard
-streamlit run dashboard/app.py
-
-# Run API
-uvicorn api.main:app --reload --port 8000
-```
-
-## Supabase Setup (optional)
-
-1. Create project at [supabase.com](https://supabase.com) - name: `indiacommerce-analytics`, region: `ap-south-1`
-2. Run `supabase_schema.sql` in SQL Editor
-3. Create Storage bucket named `datasets` (private)
-4. Add to Streamlit Cloud secrets or `.env`:
-
-```toml
-SUPABASE_URL = "https://xxxx.supabase.co"
-SUPABASE_ANON_KEY = "eyJ..."
-SUPABASE_SERVICE_KEY = "eyJ..."
-```
-
-## GitHub Update Commands
-
-```bash
-cd C:\Users\Sumedh\projects\Indian-ecommerce-project\ecommerce-analytics
-git add .
-git commit -m "your message"
-git push
-```
 
 ## Project Structure
 
@@ -115,22 +36,93 @@ ecommerce-analytics/
 │   ├── anomaly.py         # Isolation Forest + DBSCAN + Z-score
 │   ├── cohort.py          # Cohort retention heatmaps
 │   ├── inventory_alerts.py# Velocity-based inventory alerts
-│   ├── export.py          # PDF + Excel export
-│   └── ...
+│   └── export.py          # PDF + Excel export
 ├── core/
 │   ├── config.py          # App + Supabase configuration
-│   └── database.py        # Supabase persistence + model caching
+│   └── database.py        # Multi-tenant Supabase database client (JWT scoped)
 ├── dashboard/
-│   └── app.py             # Streamlit dashboard (14 tabs)
+│   └── app.py             # Stateless Streamlit dashboard
 ├── api/
-│   └── main.py            # FastAPI REST endpoints
-├── supabase_schema.sql    # Complete Supabase schema v4.0
+│   └── main.py            # FastAPI REST backend (OpenTelemetry instrumented)
+├── worker/
+│   ├── celery_app.py      # Celery worker application
+│   └── tasks.py           # Background tasks for heavy calculations
+├── supabase_schema.sql    # Multi-tenant Supabase schema v5.0
 ├── .env.example           # Environment variable template
 └── requirements.txt
 ```
 
-## Live Data Citations
+---
 
-- World Bank (2024). World Development Indicators - India. https://data.worldbank.org/country/india. License: CC BY 4.0
-- fawazahmed0 (2024). exchange-api. https://github.com/fawazahmed0/exchange-api. License: CC0
-- GeneralMills (2023). pytrends. https://github.com/GeneralMills/pytrends. License: Apache 2.0
+## Configuration Variables (.env)
+
+Rename `.env.example` to `.env` and configure:
+
+```toml
+# Supabase Configuration
+SUPABASE_URL = "https://xxxx.supabase.co"
+SUPABASE_ANON_KEY = "eyJ..."
+SUPABASE_SERVICE_KEY = "eyJ..."
+
+# Celery Task Queue Broker
+REDIS_URL = "redis://localhost:6379/0"
+
+# Backend REST Server
+API_URL = "http://localhost:8000"
+```
+
+---
+
+## Quick Start (Local Setup)
+
+### 1. Setup Environment
+```bash
+git clone https://github.com/SumedhPatil1507/indian-ecommerce-analytics
+cd ecommerce-analytics
+bash setup_env.sh
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+### 2. Start Redis Broker (via Docker)
+```bash
+docker run -d -p 6379:6379 redis:alpine
+```
+
+### 3. Start Celery Worker
+```bash
+celery -A worker.celery_app worker --loglevel=info
+```
+
+### 4. Run REST API Engine
+```bash
+uvicorn api.main:app --reload --port 8000
+```
+
+### 5. Run Dashboard
+```bash
+streamlit run dashboard/app.py
+```
+
+---
+
+## Webhook Signature Verification
+
+Shopify, WooCommerce, and Amazon webhooks must contain cryptographic signature headers matching the tenant's webhook secret configured in Supabase `profiles`.
+
+* **Shopify Header**: `X-Shopify-Hmac-SHA256`
+* **WooCommerce Header**: `X-WC-Webhook-Signature`
+* **Amazon Header**: `X-Amazon-Webhook-Signature`
+
+Signature check formula: `base64(hmac-sha256(body_bytes, tenant_secret))`
+
+---
+
+## GitHub Update Commands
+
+```bash
+cd C:\Users\Sumedh\projects\Indian-ecommerce-project\ecommerce-analytics
+git add .
+git commit -m "feat: implement stateless visual window, Celery worker queue, Postgres RLS, cryptographic webhooks, and OpenTelemetry"
+git push
+```
