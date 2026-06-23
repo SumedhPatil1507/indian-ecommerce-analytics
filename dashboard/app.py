@@ -13,6 +13,7 @@ if _ROOT not in sys.path:
     sys.path.insert(0, _ROOT)
 
 import time
+import logging
 import requests
 import numpy as np
 import pandas as pd
@@ -20,6 +21,10 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import streamlit as st
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Config variables
 import core.config as cfg
