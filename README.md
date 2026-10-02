@@ -139,3 +139,34 @@ ecommerce-analytics/
 - fawazahmed0 (2024). exchange-api. https://github.com/fawazahmed0/exchange-api. License: CC0
 - GeneralMills (2023). pytrends. https://github.com/GeneralMills/pytrends. License: Apache 2.0
 - Kaggle dataset: https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth
+
+## Merchant Insights Copilot
+
+The **Merchant Insights Copilot** is a conversational AI agent built into the dashboard that lets merchants ask natural-language questions and get synthesised, data-backed answers — without clicking through 14 tabs manually.
+
+### How it works
+
+1. **Keyword Planning** — The copilot maps your question keywords to 1-3 relevant analytics modules (`price_optimizer`, `at_risk`, `clv`, `anomaly`, `insights`, `inventory_alerts`, `price_elasticity`, `cohort`, `time_series`) using a configurable keyword→tool table.
+2. **Tool Execution** — It calls the real analytics functions from each planned module against your live filtered data and generates structured text summaries.
+3. **TF-IDF RAG** — Each tool output is chunked and stored in an in-process vector store. Relevant chunks are retrieved via cosine similarity (no external vector DB required — uses `scikit-learn` TF-IDF).
+4. **LLM Synthesis** — Retrieved chunks and fresh tool outputs are fed to OpenAI `gpt-4o-mini` (falls back to `gpt-3.5-turbo`) with an instruction to cite sources inline like `[price_optimizer]`.
+
+### Setup
+
+Set `OPENAI_API_KEY` in your `.env` file or Streamlit secrets:
+
+```env
+OPENAI_API_KEY=your_openai_api_key_here
+```
+
+### Demo Mode
+
+If `OPENAI_API_KEY` is not set, the Copilot runs in **demo mode**: it still executes all planned analytics tools and displays the raw structured summaries, but skips LLM synthesis. A yellow banner in the UI indicates demo mode.
+
+### Example Questions
+
+- "Why did AOV drop in the South zone last month?"
+- "Which customers are at risk of churning in Tier-1 cities?"
+- "What discount should I offer on Electronics to maximise revenue?"
+- "Are there any anomalous orders or fraud signals this quarter?"
+- "How does customer lifetime value compare across product categories?"

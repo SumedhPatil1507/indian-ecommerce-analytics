@@ -36,6 +36,7 @@ from core.database import (
     cache_clv, load_clv_cache, cache_anomaly_scores, load_anomaly_cache,
     cache_model_result, load_model_result, save_dataset,
 )
+from dashboard.copilot_tab import render_copilot_tab
 
 st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
@@ -298,6 +299,7 @@ tabs = st.tabs([
     "Revenue Trends", "Categories", "Regional",
     "Inventory", "CLV", "Anomalies", "Cohort", "Pareto",
     "Operational Actions",
+    "🤖 Merchant Insights Copilot",
 ])
 
 #  TAB 0: Executive Summary 
@@ -695,6 +697,7 @@ with tabs[12]:
 
 
 # TAB 13: Operational Actions
+# TAB 13: Operational Actions
 with tabs[13]:
     st.subheader("Operational Actions")
     st.caption("Approve or dismiss model recommendations. Actions logged to Supabase for audit trail.")
@@ -742,6 +745,15 @@ with tabs[13]:
             update_action_status(int(_aid), _ns); st.rerun()
     else:
         st.info("No pending actions. Configure Supabase or approve/dismiss recommendations above.")
+
+# TAB 14: Merchant Insights Copilot
+with tabs[14]:
+    render_copilot_tab(dff, filters={
+        "zones":  zones  if 'zones'  in dir() else [],
+        "cats":   cats   if 'cats'   in dir() else [],
+        "brands": brands if 'brands' in dir() else [],
+        "events": events if 'events' in dir() else [],
+    })
 
 #  FOOTER 
 st.markdown("---")
