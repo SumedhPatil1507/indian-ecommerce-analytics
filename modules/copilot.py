@@ -375,12 +375,12 @@ class MerchantCopilot:
 
     def run_time_series(self, df: pd.DataFrame, params: dict | None = None) -> str:
         """Summarise monthly revenue trends from order data."""
-        try:
-            lines = ["[time_series] Revenue Trend Analysis\n"]
-            monthly = df.groupby(df["order_date"].dt.to_period("M"))["revenue"].sum()
-            monthly.index = monthly.index.to_timestamp()
+
+        def _analyse(monthly: pd.Series, aov_monthly: pd.Series, lines: list) -> None:
+            """Shared analysis logic given pre-built monthly revenue and AOV series."""
             if monthly.empty:
-                return "[time_series] No time series data available."
+                lines.append("[time_series] No time series data available.")
+                return
             lines.append(f"Data spans {monthly.index.min().strftime('%b %Y')} to {monthly.index.max().strftime('%b %Y')}")
             lines.append(f"Peak revenue month: {monthly.idxmax().strftime('%b %Y')} (Rs{monthly.max():,.0f})")
             lines.append(f"Lowest revenue month: {monthly.idxmin().strftime('%b %Y')} (Rs{monthly.min():,.0f})")
@@ -391,12 +391,13 @@ class MerchantCopilot:
                 recent_3 = monthly.tail(3)
                 trend = (recent_3.iloc[-1] - recent_3.iloc[0]) / recent_3.iloc[0] * 100
                 lines.append(f"3-month revenue trend: {trend:+.1f}%")
-            aov_monthly = df.groupby(df["order_date"].dt.to_period("M"))["revenue"].mean()
-            aov_monthly.index = aov_monthly.index.to_timestamp()
             lines.append(f"Latest monthly AOV: Rs{aov_monthly.iloc[-1]:,.0f}")
             if len(aov_monthly) >= 2:
                 aov_mom = (aov_monthly.iloc[-1] - aov_monthly.iloc[-2]) / aov_monthly.iloc[-2] * 100
                 lines.append(f"AOV MoM change: {aov_mom:+.1f}%")
+
+        def _zone_breakdown(df: pd.DataFrame, lines: list) -> None:
+            """Append zone-level MoM breakdown to lines."""
             zone_monthly = df.groupby([df["order_date"].dt.to_period("M"), "zone"])["revenue"].sum().unstack()
             zone_monthly.index = zone_monthly.index.to_timestamp()
             if not zone_monthly.empty and len(zone_monthly) >= 2:
@@ -406,12 +407,40 @@ class MerchantCopilot:
                     if len(vals) >= 2:
                         z_mom = (vals.iloc[-1] - vals.iloc[-2]) / vals.iloc[-2] * 100
                         lines.append(f"  {zone}: {z_mom:+.1f}% MoM (latest Rs{vals.iloc[-1]:,.0f})")
+
+        lines = ["[time_series] Revenue Trend Analysis\n"]
+        try:
+            # Lazy import inside try to avoid circular imports
+            from modules.time_series import _monthly  # noqa: PLC0415
+
+            monthly = _monthly(df, col="revenue", agg="sum")
+            aov_monthly = _monthly(df, col="revenue", agg="mean")
+            if monthly.empty:
+                return "[time_series] No time series data available."
+            _analyse(monthly, aov_monthly, lines)
+            _zone_breakdown(df, lines)
             summary = "\n".join(lines)
             self._store(summary, "time_series", {})
             return summary
         except Exception as e:
-            logger.warning("time_series tool failed: %s", e)
-            return f"[time_series] Tool error: {e}"
+            logger.warning("time_series _monthly helper failed (%s); falling back to inline implementation", e)
+            # Fallback: inline groupby implementation
+            try:
+                lines = ["[time_series] Revenue Trend Analysis\n"]
+                monthly = df.groupby(df["order_date"].dt.to_period("M"))["revenue"].sum()
+                monthly.index = monthly.index.to_timestamp()
+                aov_monthly = df.groupby(df["order_date"].dt.to_period("M"))["revenue"].mean()
+                aov_monthly.index = aov_monthly.index.to_timestamp()
+                if monthly.empty:
+                    return "[time_series] No time series data available."
+                _analyse(monthly, aov_monthly, lines)
+                _zone_breakdown(df, lines)
+                summary = "\n".join(lines)
+                self._store(summary, "time_series", {})
+                return summary
+            except Exception as e2:
+                logger.warning("time_series tool failed: %s", e2)
+                return f"[time_series] Tool error: {e2}"
 
     # ------------------------------------------------------------------
     # Planning: keyword  tools
