@@ -25,7 +25,7 @@ try:
     import torch.optim as optim
     from torch.utils.data import DataLoader, TensorDataset
     _TORCH_OK = True
-except ImportError:
+except (ImportError, OSError):
     _TORCH_OK = False
 
 #  feature config 
@@ -47,17 +47,20 @@ def _preprocessor() -> ColumnTransformer:
 
 #  MLP 
 
-class _MLP(nn.Module):
-    def __init__(self, n_in: int):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(n_in, 256), nn.ReLU(), nn.Dropout(0.2),
-            nn.Linear(256, 128),  nn.ReLU(), nn.Dropout(0.2),
-            nn.Linear(128, 64),   nn.ReLU(),
-            nn.Linear(64, 1),
-        )
-    def forward(self, x):
-        return self.net(x)
+if _TORCH_OK:
+    class _MLP(nn.Module):
+        def __init__(self, n_in: int):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(n_in, 256), nn.ReLU(), nn.Dropout(0.2),
+                nn.Linear(256, 128),  nn.ReLU(), nn.Dropout(0.2),
+                nn.Linear(128, 64),   nn.ReLU(),
+                nn.Linear(64, 1),
+            )
+        def forward(self, x):
+            return self.net(x)
+else:
+    _MLP = None
 
 
 #  train / evaluate 
@@ -136,7 +139,8 @@ def _metrics(name, y_true, y_pred) -> dict:
 
 #  comparison plots 
 
-def plot_comparison(output: dict) -> None:
+def plot_comparison(output: dict) -> list:
+    figs = []
     res = output["results"]
 
     fig = make_subplots(rows=1, cols=2,
@@ -147,7 +151,7 @@ def plot_comparison(output: dict) -> None:
                          marker_color="steelblue"), row=1, col=2)
     fig.update_layout(title="Model Comparison", template="plotly_white",
                       showlegend=False)
-    fig.show()
+    figs.append(fig)
 
     # actual vs predicted
     y_te = output["y_test"]
@@ -160,7 +164,7 @@ def plot_comparison(output: dict) -> None:
         fig.add_trace(go.Scatter(x=[mn, mx], y=[mn, mx],
                                  mode="lines", line=dict(color="red", dash="dash"),
                                  name="Perfect fit"))
-        fig.show()
+        figs.append(fig)
 
     # residuals for XGBoost
     xgb_pred = output["preds"].get("XGBoost")
@@ -171,4 +175,34 @@ def plot_comparison(output: dict) -> None:
                          title="Residual Plot  XGBoost",
                          template="plotly_white")
         fig.add_hline(y=0, line_dash="dash", line_color="red")
+        figs.append(fig)
+
+    return figs
+
+
+if __name__ == "__main__":
+    rng = np.random.default_rng(42)
+    n = 200
+
+    # Minimal synthetic output dict to test plot_comparison
+    names = ["Linear Regression", "Decision Tree", "Random Forest", "XGBoost"]
+    results_df = pd.DataFrame({
+        "name": names,
+        "RMSE": rng.uniform(500, 2000, len(names)),
+        "MAE":  rng.uniform(300, 1500, len(names)),
+        "R":   rng.uniform(0.5, 0.95, len(names)),
+    })
+    y_test = pd.Series(rng.uniform(1000, 20000, n))
+    preds = {nm: y_test.values + rng.normal(0, 500, n) for nm in names}
+
+    output = {
+        "results": results_df,
+        "preds":   preds,
+        "y_test":  y_test,
+    }
+
+    print("Testing plot_comparison ...")
+    for fig in plot_comparison(output):
         fig.show()
+
+    print("All models plots rendered.")

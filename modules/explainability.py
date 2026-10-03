@@ -23,7 +23,7 @@ def plot_permutation_importance(model, X_test, y_test, feature_names, top_n=15):
     fig.update_layout(title=f"Permutation Importance  Top {top_n}",
                       xaxis_title="Mean increase in MSE",
                       template="plotly_white")
-    fig.show()
+    return fig
 
 
 def run_shap(model, X_train, X_test, feature_names, n_background=50, n_explain=300):
@@ -44,8 +44,8 @@ def run_shap(model, X_train, X_test, feature_names, n_background=50, n_explain=3
 
     # interactive summary via pareto module
     from modules.pareto import plot_shap_summary
-    plot_shap_summary(shap_values, list(feature_names))
-    return shap_values
+    shap_fig = plot_shap_summary(shap_values, list(feature_names))
+    return shap_values, shap_fig
 
 
 def run_lime(model, X_train, X_test, y_test, feature_names, n_samples=3):
@@ -65,3 +65,24 @@ def run_lime(model, X_train, X_test, y_test, feature_names, n_samples=3):
         print(f"\nLIME  Sample {i}  (true revenue = {y_test.iloc[idx]:,.0f})")
         for feat, weight in exp.as_list():
             print(f"  {feat:<55} {weight:+.4f}")
+
+
+if __name__ == "__main__":
+    from sklearn.ensemble import RandomForestRegressor
+
+    rng = np.random.default_rng(42)
+    n = 200
+    n_features = 10
+    feature_names = [f"feature_{i}" for i in range(n_features)]
+
+    X = rng.uniform(0, 1, (n, n_features))
+    y = rng.uniform(1000, 20000, n)
+
+    model = RandomForestRegressor(n_estimators=10, random_state=42)
+    model.fit(X[:160], y[:160])
+
+    print("Testing plot_permutation_importance ...")
+    fig = plot_permutation_importance(model, X[160:], y[160:], feature_names, top_n=10)
+    fig.show()
+
+    print("All explainability plots rendered.")
