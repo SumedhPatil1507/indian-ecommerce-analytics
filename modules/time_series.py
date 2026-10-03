@@ -23,7 +23,9 @@ def _monthly(df: pd.DataFrame, col: str = "revenue", agg: str = "sum") -> pd.Ser
 
 #  Line plots 
 
-def plot_trends(df: pd.DataFrame) -> None:
+def plot_trends(df: pd.DataFrame) -> list:
+    figs = []
+
     monthly_rev  = _monthly(df, "revenue", "sum").reset_index()
     monthly_rev.columns = ["date", "revenue"]
 
@@ -31,7 +33,7 @@ def plot_trends(df: pd.DataFrame) -> None:
                   title="Total Monthly Revenue Trend (36 months)",
                   labels={"revenue": "Total Revenue ()", "date": "Month"},
                   template="plotly_white")
-    fig.show()
+    figs.append(fig)
 
     # AOV
     aov = _monthly(df, "revenue", "mean").reset_index()
@@ -40,7 +42,7 @@ def plot_trends(df: pd.DataFrame) -> None:
                   title="Average Order Value (AOV) Trend",
                   labels={"aov": "Avg Revenue per Order ()", "date": "Month"},
                   template="plotly_white")
-    fig.show()
+    figs.append(fig)
 
     # order count
     cnt = df.groupby(df["order_date"].dt.to_period("M")).size()
@@ -51,7 +53,7 @@ def plot_trends(df: pd.DataFrame) -> None:
                   title="Number of Orders per Month",
                   labels={"orders": "Order Count", "date": "Month"},
                   template="plotly_white")
-    fig.show()
+    figs.append(fig)
 
     # avg discount
     disc = _monthly(df, "discount_percent", "mean").reset_index()
@@ -60,7 +62,7 @@ def plot_trends(df: pd.DataFrame) -> None:
                   title="Average Discount % Trend",
                   labels={"discount": "Avg Discount %", "date": "Month"},
                   template="plotly_white")
-    fig.show()
+    figs.append(fig)
 
     # zone comparison
     zone_m = (
@@ -72,7 +74,7 @@ def plot_trends(df: pd.DataFrame) -> None:
                   title="Monthly Revenue by Zone",
                   labels={"revenue": "Revenue ()", "date": "Month"},
                   template="plotly_white")
-    fig.show()
+    figs.append(fig)
 
     # brand type
     brand_m = (
@@ -84,12 +86,14 @@ def plot_trends(df: pd.DataFrame) -> None:
                   title="Revenue Trend: Mass vs Premium Brands",
                   labels={"revenue": "Revenue ()", "date": "Month"},
                   template="plotly_white")
-    fig.show()
+    figs.append(fig)
+
+    return figs
 
 
 #  Seasonal decomposition 
 
-def plot_decomposition(df: pd.DataFrame) -> None:
+def plot_decomposition(df: pd.DataFrame):
     from statsmodels.tsa.seasonal import seasonal_decompose
 
     monthly = _monthly(df)
@@ -107,15 +111,15 @@ def plot_decomposition(df: pd.DataFrame) -> None:
         title="Monthly Revenue  Additive Decomposition",
         height=800, template="plotly_white", showlegend=False,
     )
-    fig.show()
+    return fig
 
 
 #  Prophet forecast 
 
-def forecast_prophet(df: pd.DataFrame, periods: int = 60) -> pd.DataFrame:
+def forecast_prophet(df: pd.DataFrame, periods: int = 60):
     """
     Fit a Prophet model and forecast `periods` months ahead.
-    Returns the full forecast DataFrame.
+    Returns a tuple of (fig, forecast_DataFrame).
     """
     from prophet import Prophet  # type: ignore
 
@@ -154,16 +158,15 @@ def forecast_prophet(df: pd.DataFrame, periods: int = 60) -> pd.DataFrame:
         xaxis_title="Date", yaxis_title="Monthly Revenue ()",
         template="plotly_white",
     )
-    fig.show()
-    return forecast
+    return fig, forecast
 
 
 #  SARIMA forecast 
 
-def forecast_sarima(df: pd.DataFrame, periods: int = 60) -> pd.Series:
+def forecast_sarima(df: pd.DataFrame, periods: int = 60):
     """
     Fit SARIMA(1,1,1)(1,1,1)[12] and forecast `periods` months ahead.
-    Returns the forecast mean Series.
+    Returns a tuple of (fig, mean_Series).
     """
     from statsmodels.tsa.statespace.sarimax import SARIMAX
     import pandas.tseries.offsets as offsets
@@ -199,5 +202,30 @@ def forecast_sarima(df: pd.DataFrame, periods: int = 60) -> pd.Series:
         xaxis_title="Date", yaxis_title="Monthly Revenue ()",
         template="plotly_white",
     )
-    fig.show()
-    return mean
+    return fig, mean
+
+
+if __name__ == "__main__":
+    rng = np.random.default_rng(42)
+    n = 1000
+    dates = pd.date_range("2021-01-01", periods=n, freq="D")
+    zones = ["North", "South", "East", "West"]
+    brand_types = ["Mass", "Premium"]
+
+    df_sample = pd.DataFrame({
+        "order_date":      rng.choice(dates, n),
+        "revenue":         rng.uniform(500, 20000, n),
+        "discount_percent":rng.uniform(0, 40, n),
+        "zone":            rng.choice(zones, n),
+        "brand_type":      rng.choice(brand_types, n),
+    })
+    df_sample["order_date"] = pd.to_datetime(df_sample["order_date"])
+
+    print("Testing plot_trends ...")
+    for fig in plot_trends(df_sample):
+        fig.show()
+
+    print("Testing plot_decomposition ...")
+    plot_decomposition(df_sample).show()
+
+    print("All time_series plots rendered (skipping Prophet/SARIMA in standalone test).")

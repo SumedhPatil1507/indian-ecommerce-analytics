@@ -12,7 +12,8 @@ from plotly.subplots import make_subplots
 
 #  Histograms 
 
-def plot_distributions(df: pd.DataFrame) -> None:
+def plot_distributions(df: pd.DataFrame) -> list:
+    figs = []
     cols = {
         "customer_age":    "Customer Age (years)",
         "discount_percent":"Discount Percentage (%)",
@@ -26,7 +27,7 @@ def plot_distributions(df: pd.DataFrame) -> None:
             template="plotly_white",
         )
         fig.update_traces(marker_line_width=0.4)
-        fig.show()
+        figs.append(fig)
 
     # base vs final price overlay
     fig = go.Figure()
@@ -36,12 +37,14 @@ def plot_distributions(df: pd.DataFrame) -> None:
         barmode="overlay", title="Base Price vs Final Price Distribution",
         xaxis_title="Price ()", yaxis_title="Count", template="plotly_white",
     )
-    fig.show()
+    figs.append(fig)
+    return figs
 
 
 #  Categorical bar plots 
 
-def plot_categorical(df: pd.DataFrame) -> None:
+def plot_categorical(df: pd.DataFrame) -> list:
+    figs = []
     cat_cols   = ["category", "zone", "brand_type", "sales_event",
                   "competition_intensity", "inventory_pressure"]
     num_cols   = ["revenue", "final_price", "units_sold", "discount_percent"]
@@ -55,12 +58,14 @@ def plot_categorical(df: pd.DataFrame) -> None:
                 labels={cat: cat.title(), num: f"Mean {num.replace('_',' ').title()}"},
                 template="plotly_white", color=cat,
             )
-            fig.show()
+            figs.append(fig)
+    return figs
 
 
 #  Count plots 
 
-def plot_counts(df: pd.DataFrame) -> None:
+def plot_counts(df: pd.DataFrame) -> list:
+    figs = []
     count_cols = ["category", "zone", "brand_type", "sales_event",
                   "competition_intensity", "inventory_pressure", "customer_gender"]
     for col in count_cols:
@@ -71,7 +76,7 @@ def plot_counts(df: pd.DataFrame) -> None:
             title=f"Order Count by {col.title()}",
             template="plotly_white", color=col,
         )
-        fig.show()
+        figs.append(fig)
 
     # top 12 states
     top_states = df["state"].value_counts().head(12).reset_index()
@@ -81,12 +86,14 @@ def plot_counts(df: pd.DataFrame) -> None:
         title="Top 12 States by Order Volume",
         template="plotly_white", color="state",
     )
-    fig.show()
+    figs.append(fig)
+    return figs
 
 
 #  Pie charts 
 
-def plot_pies(df: pd.DataFrame) -> None:
+def plot_pies(df: pd.DataFrame) -> list:
+    figs = []
     pie_specs = [
         ("category",             "Revenue Share by Product Category"),
         ("zone",                 "Revenue Share by Zone"),
@@ -99,19 +106,21 @@ def plot_pies(df: pd.DataFrame) -> None:
         agg = df.groupby(col)["revenue"].sum().reset_index()
         fig = px.pie(agg, names=col, values="revenue", title=title,
                      hole=0.4, template="plotly_white")
-        fig.show()
+        figs.append(fig)
 
     # top 8 states
     state_rev = df.groupby("state")["revenue"].sum().nlargest(8).reset_index()
     fig = px.pie(state_rev, names="state", values="revenue",
                  title="Revenue Share  Top 8 States", hole=0.4,
                  template="plotly_white")
-    fig.show()
+    figs.append(fig)
+    return figs
 
 
 #  Boxplots 
 
-def plot_boxplots(df: pd.DataFrame) -> None:
+def plot_boxplots(df: pd.DataFrame) -> list:
+    figs = []
     specs = [
         ("category",             "final_price",      "Final Price by Category (log)"),
         ("sales_event",          "discount_percent",  "Discount %  Normal vs Festival"),
@@ -122,18 +131,20 @@ def plot_boxplots(df: pd.DataFrame) -> None:
         fig = px.box(df, x=x_col, y=y_col, title=title,
                      log_y=(y_col in ["final_price", "revenue"]),
                      template="plotly_white", color=x_col)
-        fig.show()
+        figs.append(fig)
 
     # units sold  brand  event
     fig = px.box(df, x="brand_type", y="units_sold", color="sales_event",
                  title="Units Sold  Mass vs Premium  Normal/Festival",
                  template="plotly_white")
-    fig.show()
+    figs.append(fig)
+    return figs
 
 
 #  Violin plots 
 
-def plot_violins(df: pd.DataFrame) -> None:
+def plot_violins(df: pd.DataFrame) -> list:
+    figs = []
     specs = [
         ("category",             "final_price",      "Final Price by Category"),
         ("sales_event",          "discount_percent",  "Discount %  Normal vs Festival"),
@@ -144,11 +155,72 @@ def plot_violins(df: pd.DataFrame) -> None:
         fig = px.violin(df, x=x_col, y=y_col, box=True, points=False,
                         title=title, template="plotly_white", color=x_col,
                         log_y=(y_col in ["final_price", "revenue"]))
-        fig.show()
+        figs.append(fig)
 
     # split violin  units sold by brand  event
     fig = px.violin(df, x="brand_type", y="units_sold", color="sales_event",
                     box=True, points=False,
                     title="Units Sold  Mass vs Premium  Normal/Festival",
                     template="plotly_white")
-    fig.show()
+    figs.append(fig)
+    return figs
+
+
+if __name__ == "__main__":
+    import random
+
+    rng = np.random.default_rng(42)
+    n = 500
+    categories = ["Electronics", "Clothing", "Home", "Sports"]
+    zones = ["North", "South", "East", "West"]
+    brand_types = ["Mass", "Premium"]
+    sales_events = ["Normal", "Festival"]
+    competition = ["Low", "Medium", "High"]
+    inventory = ["Low", "Medium", "High"]
+    genders = ["Male", "Female"]
+    states = ["Maharashtra", "Delhi", "Karnataka", "Tamil Nadu", "Gujarat",
+              "Rajasthan", "West Bengal", "Uttar Pradesh", "Telangana", "Kerala",
+              "Punjab", "Haryana"]
+
+    df_sample = pd.DataFrame({
+        "customer_age":       rng.integers(18, 65, n),
+        "discount_percent":   rng.uniform(0, 40, n),
+        "units_sold":         rng.integers(1, 10, n),
+        "base_price":         rng.uniform(200, 5000, n),
+        "final_price":        rng.uniform(150, 4800, n),
+        "revenue":            rng.uniform(500, 20000, n),
+        "category":           rng.choice(categories, n),
+        "zone":               rng.choice(zones, n),
+        "brand_type":         rng.choice(brand_types, n),
+        "sales_event":        rng.choice(sales_events, n),
+        "competition_intensity": rng.choice(competition, n),
+        "inventory_pressure": rng.choice(inventory, n),
+        "customer_gender":    rng.choice(genders, n),
+        "state":              rng.choice(states, n),
+    })
+
+    print("Testing plot_distributions ...")
+    for fig in plot_distributions(df_sample):
+        fig.show()
+
+    print("Testing plot_categorical ...")
+    for fig in plot_categorical(df_sample):
+        fig.show()
+
+    print("Testing plot_counts ...")
+    for fig in plot_counts(df_sample):
+        fig.show()
+
+    print("Testing plot_pies ...")
+    for fig in plot_pies(df_sample):
+        fig.show()
+
+    print("Testing plot_boxplots ...")
+    for fig in plot_boxplots(df_sample):
+        fig.show()
+
+    print("Testing plot_violins ...")
+    for fig in plot_violins(df_sample):
+        fig.show()
+
+    print("All EDA plots rendered.")

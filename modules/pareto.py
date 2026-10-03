@@ -21,7 +21,7 @@ def plot_pareto(
     df: pd.DataFrame,
     group_col: str = "category",
     value_col: str = "revenue",
-) -> None:
+):
     """
     Pareto chart: bars = revenue per group, line = cumulative %.
     Highlights the 80% threshold.
@@ -54,12 +54,12 @@ def plot_pareto(
     )
     fig.update_yaxes(title_text=f"Total {value_col.title()} ()", secondary_y=False)
     fig.update_yaxes(title_text="Cumulative %", secondary_y=True)
-    fig.show()
+    return fig
 
 
 #  Sunburst Chart 
 
-def plot_sunburst(df: pd.DataFrame) -> None:
+def plot_sunburst(df: pd.DataFrame):
     """
     Interactive sunburst: category  zone  brand_type, sized by revenue.
     """
@@ -78,12 +78,12 @@ def plot_sunburst(df: pd.DataFrame) -> None:
         color_continuous_scale="RdBu",
     )
     fig.update_traces(textinfo="label+percent parent")
-    fig.show()
+    return fig
 
 
 #  SHAP Summary (interactive Plotly) 
 
-def plot_shap_summary(shap_values: np.ndarray, feature_names: list, top_n: int = 15) -> None:
+def plot_shap_summary(shap_values: np.ndarray, feature_names: list, top_n: int = 15):
     """
     Interactive SHAP beeswarm-style bar chart using Plotly.
 
@@ -112,7 +112,7 @@ def plot_shap_summary(shap_values: np.ndarray, feature_names: list, top_n: int =
         xaxis_title="Mean |SHAP value|",
         template="plotly_white",
     )
-    fig.show()
+    return fig
 
 
 #  Regional Choropleth Map 
@@ -154,34 +154,50 @@ _STATE_ISO = {
 }
 
 
-def plot_choropleth(df: pd.DataFrame, metric: str = "revenue") -> None:
+def plot_choropleth(df: pd.DataFrame, metric: str = "revenue"):
     """
     Interactive choropleth map of India coloured by revenue / order count.
 
-    Uses Plotly's built-in India GeoJSON via location_mode='geojson-id'.
+    Uses a locally cached GeoJSON (downloaded on first call).
     Falls back to a bar chart if GeoJSON is unavailable.
     """
+    import os, json, requests
+
+    GEOJSON_CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'data', 'india_states.geojson')
+    GEOJSON_CACHE = os.path.normpath(GEOJSON_CACHE)
+    GEOJSON_URL   = 'https://raw.githubusercontent.com/geohacker/india/master/state/india_telengana.geojson'
+    os.makedirs(os.path.dirname(GEOJSON_CACHE), exist_ok=True)
+    if os.path.exists(GEOJSON_CACHE):
+        with open(GEOJSON_CACHE) as f:
+            geojson_data = json.load(f)
+    else:
+        try:
+            resp = requests.get(GEOJSON_URL, timeout=10)
+            resp.raise_for_status()
+            geojson_data = resp.json()
+            with open(GEOJSON_CACHE, 'w') as f:
+                json.dump(geojson_data, f)
+        except Exception:
+            geojson_data = None  # fallback to bar chart
+
     agg = df.groupby("state")[metric].sum().reset_index()
     agg["iso"] = agg["state"].map(_STATE_ISO)
     agg = agg.dropna(subset=["iso"])
 
-    if agg.empty:
-        print("  No state  ISO mapping found. Showing bar chart instead.")
+    if agg.empty or geojson_data is None:
+        if agg.empty:
+            print("  No state  ISO mapping found. Showing bar chart instead.")
         fig = px.bar(
             df.groupby("state")[metric].sum().nlargest(20).reset_index(),
             x=metric, y="state", orientation="h",
             title=f"Top 20 States by {metric.title()}",
             template="plotly_white",
         )
-        fig.show()
-        return
+        return fig
 
     fig = px.choropleth(
         agg,
-        geojson=(
-            "https://raw.githubusercontent.com/geohacker/india/master/"
-            "state/india_telengana.geojson"
-        ),
+        geojson=geojson_data,
         locations="iso",
         featureidkey="properties.ST_NM",
         color=metric,
@@ -191,12 +207,12 @@ def plot_choropleth(df: pd.DataFrame, metric: str = "revenue") -> None:
         template="plotly_white",
     )
     fig.update_geos(fitbounds="locations", visible=False)
-    fig.show()
+    return fig
 
 
 #  Advanced statistical plots 
 
-def plot_lorenz(df: pd.DataFrame, col: str = "revenue") -> None:
+def plot_lorenz(df: pd.DataFrame, col: str = "revenue"):
     vals = np.sort(df[col].dropna().values)[::-1]
     cum  = np.cumsum(vals) / vals.sum()
     x    = np.linspace(0, 1, len(cum))
@@ -216,10 +232,10 @@ def plot_lorenz(df: pd.DataFrame, col: str = "revenue") -> None:
         yaxis_title=f"Cumulative share of {col}",
         template="plotly_white",
     )
-    fig.show()
+    return fig
 
 
-def plot_ecdf(df: pd.DataFrame) -> None:
+def plot_ecdf(df: pd.DataFrame):
     fig = go.Figure()
     for col, colour in [("revenue","navy"), ("final_price","forestgreen"), ("units_sold","maroon")]:
         s = np.sort(df[col].dropna().values)
@@ -231,10 +247,10 @@ def plot_ecdf(df: pd.DataFrame) -> None:
         xaxis_title="Value (log scale)", yaxis_title="Cumulative Proportion",
         xaxis_type="log", template="plotly_white",
     )
-    fig.show()
+    return fig
 
 
-def plot_rolling_stats(df: pd.DataFrame) -> None:
+def plot_rolling_stats(df: pd.DataFrame):
     monthly = df.groupby(df["order_date"].dt.to_period("M"))["revenue"].sum()
     monthly.index = monthly.index.to_timestamp()
     roll_mean = monthly.rolling(3, center=True).mean()
@@ -258,18 +274,66 @@ def plot_rolling_stats(df: pd.DataFrame) -> None:
         xaxis_title="Month", yaxis_title="Revenue ()",
         template="plotly_white",
     )
-    fig.show()
+    return fig
 
 
 def run_premium_visuals(df: pd.DataFrame) -> None:
     print("=" * 60)
     print("  PREMIUM VISUALISATIONS")
     print("=" * 60)
-    plot_pareto(df, "category", "revenue")
-    plot_pareto(df, "state",    "revenue")
-    plot_sunburst(df)
-    plot_choropleth(df, "revenue")
-    plot_lorenz(df)
-    plot_ecdf(df)
-    plot_rolling_stats(df)
+    fig = plot_pareto(df, "category", "revenue"); fig.show()
+    fig = plot_pareto(df, "state",    "revenue"); fig.show()
+    fig = plot_sunburst(df); fig.show()
+    fig = plot_choropleth(df, "revenue"); fig.show()
+    fig = plot_lorenz(df); fig.show()
+    fig = plot_ecdf(df); fig.show()
+    fig = plot_rolling_stats(df); fig.show()
 
+
+if __name__ == "__main__":
+    rng = np.random.default_rng(42)
+    n = 500
+    categories = ["Electronics", "Clothing", "Home", "Sports"]
+    zones = ["North", "South", "East", "West"]
+    brand_types = ["Mass", "Premium"]
+    states = ["Maharashtra", "Delhi", "Karnataka", "Tamil Nadu", "Gujarat",
+              "Rajasthan", "West Bengal", "Uttar Pradesh", "Telangana", "Kerala",
+              "Punjab", "Haryana"]
+    dates = pd.date_range("2021-01-01", periods=n, freq="D")
+
+    df_sample = pd.DataFrame({
+        "order_date":  rng.choice(dates, n),
+        "revenue":     rng.uniform(500, 20000, n),
+        "final_price": rng.uniform(150, 4800, n),
+        "units_sold":  rng.integers(1, 10, n),
+        "category":    rng.choice(categories, n),
+        "zone":        rng.choice(zones, n),
+        "brand_type":  rng.choice(brand_types, n),
+        "state":       rng.choice(states, n),
+    })
+    df_sample["order_date"] = pd.to_datetime(df_sample["order_date"])
+
+    print("Testing plot_pareto ...")
+    plot_pareto(df_sample, "category", "revenue").show()
+
+    print("Testing plot_sunburst ...")
+    plot_sunburst(df_sample).show()
+
+    print("Testing plot_shap_summary ...")
+    shap_vals = rng.uniform(-1, 1, (100, 5))
+    feat_names = ["feat_a", "feat_b", "feat_c", "feat_d", "feat_e"]
+    plot_shap_summary(shap_vals, feat_names, top_n=5).show()
+
+    print("Testing plot_choropleth ...")
+    plot_choropleth(df_sample, "revenue").show()
+
+    print("Testing plot_lorenz ...")
+    plot_lorenz(df_sample).show()
+
+    print("Testing plot_ecdf ...")
+    plot_ecdf(df_sample).show()
+
+    print("Testing plot_rolling_stats ...")
+    plot_rolling_stats(df_sample).show()
+
+    print("All pareto/premium plots rendered.")
