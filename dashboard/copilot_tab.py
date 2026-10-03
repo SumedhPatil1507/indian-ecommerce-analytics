@@ -25,9 +25,8 @@ def render_copilot_tab(df: pd.DataFrame, filters: dict | None = None) -> None:
     api_key = os.environ.get("OPENAI_API_KEY", "")
     if not api_key:
         st.warning(
-            " Running in demo mode  set `OPENAI_API_KEY` in your `.env` or Streamlit secrets "
-            "for AI-generated answers.",
-            icon="",
+            "⚠️ Running in demo mode — set `OPENAI_API_KEY` in your `.env` or Streamlit secrets "
+            "for AI-generated answers."
         )
 
     st.markdown(

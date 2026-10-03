@@ -39,7 +39,7 @@ from core.database import (
 from dashboard.copilot_tab import render_copilot_tab
 from dashboard.style import THEME_CSS, apply_dark_theme
 
-st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
+st.set_page_config(page_title=cfg.APP_NAME, page_icon="🛒",
                    layout="wide", initial_sidebar_state="expanded")
 
 CSS = """
