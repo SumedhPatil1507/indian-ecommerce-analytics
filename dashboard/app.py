@@ -300,6 +300,9 @@ tabs = st.tabs([
     "Inventory", "CLV", "Anomalies", "Cohort", "Pareto",
     "Operational Actions",
     "🤖 Merchant Insights Copilot",
+    "🔍 Exploratory Analysis",
+    "📈 Forecasting",
+    "🤖 ML Models",
 ])
 
 #  TAB 0: Executive Summary 
@@ -749,11 +752,150 @@ with tabs[13]:
 # TAB 14: Merchant Insights Copilot
 with tabs[14]:
     render_copilot_tab(dff, filters={
-        "zones":  zones  if 'zones'  in dir() else [],
-        "cats":   cats   if 'cats'   in dir() else [],
-        "brands": brands if 'brands' in dir() else [],
-        "events": events if 'events' in dir() else [],
+        "zones":  zones,
+        "cats":   cats,
+        "brands": brands,
+        "events": events,
     })
+
+# TAB 15: Exploratory Analysis
+with tabs[15]:
+    st.header("🔍 Exploratory Data Analysis")
+    try:
+        import modules.eda as eda_mod
+
+        def _show_figs(figs):
+            if figs is None:
+                return
+            if isinstance(figs, list):
+                for f in figs:
+                    if f is not None:
+                        st.plotly_chart(f, use_container_width=True)
+            else:
+                st.plotly_chart(figs, use_container_width=True)
+
+        st.subheader("Distributions")
+        try:
+            _show_figs(eda_mod.plot_distributions(dff))
+        except Exception as e:
+            st.warning(f"plot_distributions could not render: {e}")
+
+        st.subheader("Category & Zone Breakdown")
+        try:
+            _show_figs(eda_mod.plot_categorical(dff))
+        except Exception as e:
+            st.warning(f"plot_categorical could not render: {e}")
+
+        st.subheader("Order Count Analysis")
+        try:
+            _show_figs(eda_mod.plot_counts(dff))
+        except Exception as e:
+            st.warning(f"plot_counts could not render: {e}")
+
+        st.subheader("Revenue Share (Pie Charts)")
+        try:
+            _show_figs(eda_mod.plot_pies(dff))
+        except Exception as e:
+            st.warning(f"plot_pies could not render: {e}")
+
+        st.subheader("Box Plots")
+        try:
+            _show_figs(eda_mod.plot_boxplots(dff))
+        except Exception as e:
+            st.warning(f"plot_boxplots could not render: {e}")
+
+        st.subheader("Violin Plots")
+        try:
+            _show_figs(eda_mod.plot_violins(dff))
+        except Exception as e:
+            st.warning(f"plot_violins could not render: {e}")
+
+    except Exception as e:
+        st.error(f"EDA module error: {e}")
+
+# TAB 16: Forecasting
+with tabs[16]:
+    st.header("📈 Time Series Forecasting")
+    forecast_horizon = st.number_input("Forecast horizon (months)", min_value=1, max_value=24, value=6, step=1)
+
+    st.subheader("Revenue & AOV Trends")
+    try:
+        import modules.time_series as ts_mod
+        trend_figs = ts_mod.plot_trends(dff)
+        for f in trend_figs:
+            st.plotly_chart(f, use_container_width=True)
+    except Exception as e:
+        st.warning(f"Trend plots error: {e}")
+
+    st.subheader("Seasonal Decomposition")
+    try:
+        import modules.time_series as ts_mod
+        decomp_fig = ts_mod.plot_decomposition(dff)
+        st.plotly_chart(decomp_fig, use_container_width=True)
+    except ImportError as e:
+        st.info(f"Install statsmodels for seasonal decomposition: {e}")
+    except Exception as e:
+        st.warning(f"Decomposition error (need 24+ months of data): {e}")
+
+    st.subheader("Prophet Forecast")
+    try:
+        import modules.time_series as ts_mod
+        prophet_fig, _ = ts_mod.forecast_prophet(dff, periods=int(forecast_horizon))
+        st.plotly_chart(prophet_fig, use_container_width=True)
+    except ImportError as e:
+        st.info(f"Install prophet for Prophet forecasting: pip install prophet. Error: {e}")
+    except Exception as e:
+        st.warning(f"Prophet forecast error: {e}")
+
+    st.subheader("SARIMA Forecast")
+    try:
+        import modules.time_series as ts_mod
+        sarima_fig, _ = ts_mod.forecast_sarima(dff, periods=int(forecast_horizon))
+        st.plotly_chart(sarima_fig, use_container_width=True)
+    except ImportError as e:
+        st.info(f"Install statsmodels for SARIMA forecasting. Error: {e}")
+    except Exception as e:
+        st.warning(f"SARIMA forecast error (need 24+ months of data): {e}")
+
+# TAB 17: ML Models
+with tabs[17]:
+    st.header("🤖 ML Models & Explainability")
+    st.caption("Train and compare Linear Regression, Decision Tree, Random Forest, XGBoost, and Neural Network on your data.")
+    if st.button("Train Models", type="primary", key="train_models_btn"):
+        try:
+            import modules.models as models_mod
+            import modules.explainability as expl_mod
+
+            with st.spinner("Training models... this may take 30-60 seconds"):
+                ml_output = models_mod.train_all(dff)
+
+            st.success(f"Trained {len(ml_output['results'])} models successfully.")
+            st.dataframe(ml_output["results"].round(3), use_container_width=True, hide_index=True)
+
+            st.subheader("Model Comparison Plots")
+            comparison_figs = models_mod.plot_comparison(ml_output)
+            for f in comparison_figs:
+                st.plotly_chart(f, use_container_width=True)
+
+            st.subheader("Permutation Feature Importance (Random Forest)")
+            try:
+                rf_pipe = ml_output["pipes"].get("Random Forest")
+                if rf_pipe is not None:
+                    rf_model = rf_pipe.named_steps["model"]
+                    X_te_t = ml_output["X_test_t"]
+                    y_te = ml_output["y_test"]
+                    feat_names = ml_output["feat_names"]
+                    perm_fig = expl_mod.plot_permutation_importance(
+                        rf_model, X_te_t, y_te, feat_names, top_n=15
+                    )
+                    st.plotly_chart(perm_fig, use_container_width=True)
+            except Exception as e:
+                st.warning(f"Permutation importance error: {e}")
+
+        except Exception as e:
+            st.warning(f"ML Models training error: {e}")
+    else:
+        st.info("Click 'Train Models' to train all ML models on the current filtered dataset. Note: training may take 30-60 seconds.")
 
 #  FOOTER 
 st.markdown("---")
