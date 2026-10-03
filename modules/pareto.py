@@ -278,16 +278,17 @@ def plot_rolling_stats(df: pd.DataFrame):
 
 
 def run_premium_visuals(df: pd.DataFrame) -> None:
+    """Standalone runner — displays all premium visualisation figures."""
     print("=" * 60)
     print("  PREMIUM VISUALISATIONS")
     print("=" * 60)
-    fig = plot_pareto(df, "category", "revenue"); fig.show()
-    fig = plot_pareto(df, "state",    "revenue"); fig.show()
-    fig = plot_sunburst(df); fig.show()
-    fig = plot_choropleth(df, "revenue"); fig.show()
-    fig = plot_lorenz(df); fig.show()
-    fig = plot_ecdf(df); fig.show()
-    fig = plot_rolling_stats(df); fig.show()
+    plot_pareto(df, "category", "revenue").show()
+    plot_pareto(df, "state",    "revenue").show()
+    plot_sunburst(df).show()
+    plot_choropleth(df, "revenue").show()
+    plot_lorenz(df).show()
+    plot_ecdf(df).show()
+    plot_rolling_stats(df).show()
 
 
 if __name__ == "__main__":

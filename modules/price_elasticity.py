@@ -65,36 +65,38 @@ def compute_elasticity(
 
 #  plots 
 
-def plot_elasticity_heatmap(df: pd.DataFrame) -> None:
+def plot_elasticity_heatmap(df: pd.DataFrame):
     """
-    Heatmap of price elasticity: category  zone.
+    Heatmap of price elasticity: category × zone.
+    Returns a Plotly Figure, or None if not enough data.
     """
     elast = compute_elasticity(df, group_cols=["category", "zone"])
     if elast.empty:
-        print("Not enough data for category  zone elasticity.")
-        return
+        print("Not enough data for category × zone elasticity.")
+        return None
 
     pivot = elast.pivot(index="category", columns="zone", values="elasticity")
     fig = px.imshow(
         pivot,
         color_continuous_scale="RdBu",
         color_continuous_midpoint=0,
-        title="Price Elasticity Heatmap  Category  Zone",
-        labels={"color": "Elasticity ()"},
+        title="Price Elasticity Heatmap — Category × Zone",
+        labels={"color": "Elasticity (β)"},
         text_auto=".2f",
         template="plotly_white",
     )
     fig.update_layout(coloraxis_colorbar_title="Elasticity")
-    fig.show()
+    return fig
 
 
-def plot_elasticity_waterfall(df: pd.DataFrame) -> None:
+def plot_elasticity_waterfall(df: pd.DataFrame):
     """
     Waterfall / bar chart of elasticity by category, coloured by elastic vs inelastic.
+    Returns a Plotly Figure, or None if not enough data.
     """
     elast = compute_elasticity(df, group_cols=["category"])
     if elast.empty:
-        return
+        return None
 
     elast["type"] = elast["elasticity"].apply(
         lambda e: "Elastic (< -1)" if e < -1
@@ -110,34 +112,38 @@ def plot_elasticity_waterfall(df: pd.DataFrame) -> None:
             "Giffen / Luxury":"gold",
         },
         title="Price Elasticity by Category",
-        labels={"elasticity": "Elasticity Coefficient ()", "category": "Category"},
+        labels={"elasticity": "Elasticity Coefficient (β)", "category": "Category"},
         template="plotly_white",
         text="elasticity",
     )
     fig.add_vline(x=-1, line_dash="dash", line_color="gray",
-                  annotation_text="Elastic threshold ( = -1)")
+                  annotation_text="Elastic threshold (β = -1)")
     fig.add_vline(x=0,  line_dash="dot",  line_color="black")
-    fig.show()
+    return fig
 
 
-def plot_elasticity_by_brand(df: pd.DataFrame) -> None:
+def plot_elasticity_by_brand(df: pd.DataFrame):
+    """
+    Bar chart of elasticity: Mass vs Premium by category.
+    Returns a Plotly Figure, or None if not enough data.
+    """
     elast = compute_elasticity(df, group_cols=["brand_type", "category"])
     if elast.empty:
-        return
+        return None
     fig = px.bar(
         elast, x="category", y="elasticity", color="brand_type",
         barmode="group",
-        title="Price Elasticity  Mass vs Premium by Category",
-        labels={"elasticity": "Elasticity ()"},
+        title="Price Elasticity — Mass vs Premium by Category",
+        labels={"elasticity": "Elasticity (β)"},
         template="plotly_white",
     )
     fig.add_hline(y=-1, line_dash="dash", line_color="red",
                   annotation_text="Elastic threshold")
-    fig.show()
+    return fig
 
 
 def run_elasticity_engine(df: pd.DataFrame) -> None:
-    """Entry point  run all elasticity plots."""
+    """Entry point — run all elasticity plots."""
     print("=" * 60)
     print("  PRICE ELASTICITY ENGINE")
     print("=" * 60)
@@ -147,18 +153,19 @@ def run_elasticity_engine(df: pd.DataFrame) -> None:
     print("\nElasticity by Category:")
     print(summary.to_string(index=False))
 
-    plot_elasticity_waterfall(df)
-    plot_elasticity_heatmap(df)
-    plot_elasticity_by_brand(df)
+    for fn in [plot_elasticity_waterfall, plot_elasticity_heatmap, plot_elasticity_by_brand]:
+        fig = fn(df)
+        if fig is not None:
+            fig.show()
 
     # optimal discount recommendation
     print("\n--- Optimal Discount Recommendation ---")
     for _, row in summary.iterrows():
         e = row["elasticity"]
         if e < -1:
-            rec = "Aggressive discounting justified  demand is elastic"
+            rec = "Aggressive discounting justified — demand is elastic"
         elif -1 <= e < 0:
-            rec = "Moderate discounts  demand is inelastic, protect margins"
+            rec = "Moderate discounts — demand is inelastic, protect margins"
         else:
-            rec = "Luxury / Giffen signal  discounting may reduce perceived value"
-        print(f"  {row['category']:<30} ={e:+.3f}   {rec}")
+            rec = "Luxury / Giffen signal — discounting may reduce perceived value"
+        print(f"  {row['category']:<30} β={e:+.3f}   {rec}")

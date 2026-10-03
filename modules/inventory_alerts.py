@@ -78,8 +78,8 @@ def compute_alerts(df: pd.DataFrame) -> pd.DataFrame:
 
 #  plots 
 
-def plot_inventory_heatmap(df: pd.DataFrame) -> None:
-    """Heatmap: avg units sold per category  zone."""
+def plot_inventory_heatmap(df: pd.DataFrame):
+    """Heatmap: avg units sold per category × zone. Returns a Plotly Figure."""
     pivot = (
         df.groupby(["category", "zone"])["units_sold"]
         .mean()
@@ -89,27 +89,35 @@ def plot_inventory_heatmap(df: pd.DataFrame) -> None:
     fig = px.imshow(
         pivot,
         color_continuous_scale="YlOrRd",
-        title="Avg Units Sold  Category  Zone (Inventory Velocity)",
+        title="Avg Units Sold — Category × Zone (Inventory Velocity)",
         labels={"color": "Avg Units Sold"},
         text_auto=True,
         template="plotly_white",
     )
-    fig.show()
+    return fig
 
 
-def plot_alert_dashboard(df: pd.DataFrame) -> None:
+def plot_alert_dashboard(df: pd.DataFrame) -> list:
+    """
+    Generate inventory alert dashboard figures.
+
+    Returns a list of Plotly figures:
+      [0] Discount vs Velocity scatter with alert colours
+      [1] Top Critical/High-Alert groups bar chart (may be absent if no alerts)
+    """
     alerts = compute_alerts(df)
+    figs = []
 
     # colour map
     colour_map = {
-        " CRITICAL  Reorder Now":    "red",
-        " HIGH  Monitor Closely":    "orange",
-        " CLEARANCE  Excess Stock":  "gold",
-        " SLOW MOVER  Review Listing":"steelblue",
-        " HEALTHY":                   "green",
+        "CRITICAL - Reorder Now":    "red",
+        "HIGH - Monitor Closely":    "orange",
+        "CLEARANCE - Excess Stock":  "gold",
+        "SLOW MOVER - Review Listing": "steelblue",
+        "HEALTHY":                   "green",
     }
 
-    fig = px.scatter(
+    fig1 = px.scatter(
         alerts,
         x="avg_discount",
         y="avg_units_sold",
@@ -117,7 +125,7 @@ def plot_alert_dashboard(df: pd.DataFrame) -> None:
         size="high_pressure_pct",
         hover_data=["category", "zone", "recommendation"],
         color_discrete_map=colour_map,
-        title="Inventory Alert Dashboard  Discount vs Velocity",
+        title="Inventory Alert Dashboard — Discount vs Velocity",
         labels={
             "avg_discount":   "Avg Discount %",
             "avg_units_sold": "Avg Units Sold",
@@ -125,26 +133,29 @@ def plot_alert_dashboard(df: pd.DataFrame) -> None:
         },
         template="plotly_white",
     )
-    fig.add_vline(x=DISCOUNT_SPIKE_THRESH, line_dash="dash", line_color="gray",
-                  annotation_text="Clearance threshold")
-    fig.show()
+    fig1.add_vline(x=DISCOUNT_SPIKE_THRESH, line_dash="dash", line_color="gray",
+                   annotation_text="Clearance threshold")
+    figs.append(fig1)
 
-    # bar chart  top 15 critical groups
+    # bar chart — top 15 critical groups
     top = alerts[alerts["alert_level"].str.contains("CRITICAL|HIGH")].head(15)
     if not top.empty:
+        top = top.copy()
         top["group"] = top["category"] + " / " + top["zone"]
         fig2 = px.bar(
             top, x="velocity_score", y="group", orientation="h",
             color="alert_level", color_discrete_map=colour_map,
             title="Top Critical / High-Alert Inventory Groups",
-            labels={"velocity_score": "Velocity Score (0100)", "group": "Category / Zone"},
+            labels={"velocity_score": "Velocity Score (0–100)", "group": "Category / Zone"},
             template="plotly_white",
         )
-        fig2.show()
+        figs.append(fig2)
+
+    return figs
 
 
 def run_inventory_alerts(df: pd.DataFrame) -> None:
-    """Entry point  print alert table and show plots."""
+    """Entry point — print alert table and show plots."""
     print("=" * 70)
     print("  DYNAMIC INVENTORY ALERT SYSTEM")
     print("=" * 70)
@@ -157,8 +168,9 @@ def run_inventory_alerts(df: pd.DataFrame) -> None:
                      "high_pressure_pct", "alert_level", "recommendation"]]
           .to_string(index=False))
 
-    plot_inventory_heatmap(df)
-    plot_alert_dashboard(df)
+    plot_inventory_heatmap(df).show()
+    for fig in plot_alert_dashboard(df):
+        fig.show()
 
     print("\n Full alert table:")
     print(alerts[["category", "zone", "alert_level", "recommendation"]]

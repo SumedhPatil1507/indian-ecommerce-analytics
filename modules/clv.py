@@ -136,39 +136,52 @@ def _add_tiers(df: pd.DataFrame) -> pd.DataFrame:
 
 #  plots 
 
-def plot_clv(df: pd.DataFrame) -> None:
+def plot_clv(df: pd.DataFrame) -> list:
+    """
+    Generate CLV visualisation figures.
+
+    Returns a list of three interactive Plotly figures:
+      [0] CLV distribution histogram by tier
+      [1] CLV share pie chart by tier
+      [2] Purchase frequency vs CLV scatter
+    """
     clv_df = compute_clv(df)
+    figs = []
 
     # distribution
-    fig = px.histogram(clv_df, x="clv", nbins=60, color="clv_tier",
-                       title="CLV Distribution by Tier",
-                       labels={"clv": "Customer Lifetime Value ()"},
-                       template="plotly_white", marginal="box")
-    fig.show()
+    fig1 = px.histogram(clv_df, x="clv", nbins=60, color="clv_tier",
+                        title="CLV Distribution by Tier",
+                        labels={"clv": "Customer Lifetime Value (₹)"},
+                        template="plotly_white", marginal="box")
+    figs.append(fig1)
 
     # tier pie
     tier_rev = clv_df.groupby("clv_tier")["clv"].sum().reset_index()
-    fig = px.pie(tier_rev, names="clv_tier", values="clv",
-                 title="CLV Share by Customer Tier", hole=0.4,
-                 template="plotly_white",
-                 color_discrete_sequence=px.colors.qualitative.Set2)
-    fig.show()
+    fig2 = px.pie(tier_rev, names="clv_tier", values="clv",
+                  title="CLV Share by Customer Tier", hole=0.4,
+                  template="plotly_white",
+                  color_discrete_sequence=px.colors.qualitative.Set2)
+    figs.append(fig2)
 
     # frequency vs CLV scatter
-    fig = px.scatter(clv_df, x="frequency", y="clv", color="clv_tier",
-                     opacity=0.6, size="monetary",
-                     title="Purchase Frequency vs CLV",
-                     labels={"frequency": "Purchase Frequency", "clv": "CLV ()"},
-                     template="plotly_white",
-                     color_discrete_sequence=px.colors.qualitative.Set2)
-    fig.show()
+    fig3 = px.scatter(clv_df, x="frequency", y="clv", color="clv_tier",
+                      opacity=0.6, size="monetary",
+                      title="Purchase Frequency vs CLV",
+                      labels={"frequency": "Purchase Frequency", "clv": "CLV (₹)"},
+                      template="plotly_white",
+                      color_discrete_sequence=px.colors.qualitative.Set2)
+    figs.append(fig3)
 
-    print("\nCLV Tier Summary:")
-    print(clv_df.groupby("clv_tier")["clv"].agg(["count", "mean", "sum"]).round(2))
+    return figs
 
 
 def run_clv(df: pd.DataFrame) -> None:
     print("=" * 60)
     print("  CUSTOMER LIFETIME VALUE PREDICTOR")
     print("=" * 60)
-    plot_clv(df)
+    figs = plot_clv(df)
+    for fig in figs:
+        fig.show()
+    clv_df = compute_clv(df)
+    print("\nCLV Tier Summary:")
+    print(clv_df.groupby("clv_tier")["clv"].agg(["count", "mean", "sum"]).round(2))

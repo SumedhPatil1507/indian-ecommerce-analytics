@@ -104,36 +104,46 @@ def anomaly_report(df: pd.DataFrame) -> pd.DataFrame:
 
 #  plots 
 
-def plot_anomalies(df: pd.DataFrame) -> None:
+def plot_anomalies(df: pd.DataFrame) -> list:
+    """
+    Generate anomaly detection figures.
+
+    Returns a list of three interactive Plotly figures:
+      [0] log(Units) vs log(Revenue) scatter
+      [1] Discount % vs log(Final Price) scatter
+      [2] Confirmed anomalies by category bar chart
+    """
     df = anomaly_report(df)
 
+    figs = []
+
     # scatter: units vs revenue
-    fig = px.scatter(
+    fig1 = px.scatter(
         df, x="log_units_sold", y="log_revenue",
         color="confirmed_anomaly",
         color_discrete_map={True: "red", False: "steelblue"},
         opacity=0.6, size_max=8,
-        title="Anomaly Detection  log(Units) vs log(Revenue)",
+        title="Anomaly Detection — log(Units) vs log(Revenue)",
         labels={"log_units_sold": "log(Units Sold)", "log_revenue": "log(Revenue)",
                 "confirmed_anomaly": "Anomaly"},
         template="plotly_white",
         hover_data=["category", "zone", "discount_percent", "anomaly_votes"],
     )
-    fig.show()
+    figs.append(fig1)
 
     # scatter: discount vs price
-    fig = px.scatter(
+    fig2 = px.scatter(
         df, x="discount_percent", y="log_final_price",
         color="confirmed_anomaly",
         color_discrete_map={True: "red", False: "lightgray"},
         opacity=0.55,
-        title="Anomaly Detection  Discount % vs log(Final Price)",
+        title="Anomaly Detection — Discount % vs log(Final Price)",
         labels={"discount_percent": "Discount %", "log_final_price": "log(Final Price)",
                 "confirmed_anomaly": "Anomaly"},
         template="plotly_white",
         hover_data=["category", "zone", "anomaly_votes"],
     )
-    fig.show()
+    figs.append(fig2)
 
     # anomaly count by category
     cat_anom = (
@@ -143,20 +153,24 @@ def plot_anomalies(df: pd.DataFrame) -> None:
         .reset_index(name="anomaly_count")
         .sort_values("anomaly_count", ascending=False)
     )
-    fig = px.bar(cat_anom, x="category", y="anomaly_count",
-                 title="Confirmed Anomalies by Category",
-                 labels={"anomaly_count": "Anomaly Count"},
-                 template="plotly_white", color="category")
-    fig.show()
+    fig3 = px.bar(cat_anom, x="category", y="anomaly_count",
+                  title="Confirmed Anomalies by Category",
+                  labels={"anomaly_count": "Anomaly Count"},
+                  template="plotly_white", color="category")
+    figs.append(fig3)
 
-    n = df["confirmed_anomaly"].sum()
-    print(f"\n Anomaly detection complete.")
-    print(f"   Confirmed anomalies (2 detectors): {n:,} ({n/len(df):.2%} of orders)")
-    return df
+    return figs
 
 
 def run_anomaly_detection(df: pd.DataFrame) -> pd.DataFrame:
     print("=" * 60)
     print("  AUTOMATED ANOMALY DETECTION")
     print("=" * 60)
-    return plot_anomalies(df)
+    figs = plot_anomalies(df)
+    for fig in figs:
+        fig.show()
+    df = anomaly_report(df)
+    n = df["confirmed_anomaly"].sum()
+    print(f"\n✓ Anomaly detection complete.")
+    print(f"  Confirmed anomalies (≥2 detectors): {n:,} ({n/len(df):.2%} of orders)")
+    return df

@@ -69,23 +69,25 @@ def build_cohort_table(df: pd.DataFrame, metric: str = "revenue") -> pd.DataFram
     return pivot
 
 
-def plot_cohort_heatmap(df: pd.DataFrame, metric: str = "revenue") -> None:
+def plot_cohort_heatmap(df: pd.DataFrame, metric: str = "revenue"):
     """
     Plot an interactive cohort heatmap.
 
     metric : "revenue" or "count"
+
+    Returns a Plotly Figure.
     """
     pivot = build_cohort_table(df, metric=metric)
 
     # retention rate (normalise by cohort size at period 0)
     if metric == "count":
         retention = pivot.div(pivot[0], axis=0) * 100
-        title = "Cohort Retention Rate (%)  Order Count"
+        title = "Cohort Retention Rate (%)  — Order Count"
         fmt = ".1f"
         cmap = "Blues"
     else:
         retention = pivot.div(pivot[0], axis=0) * 100
-        title = "Cohort Revenue Retention (%)  Normalised by Month 0"
+        title = "Cohort Revenue Retention (%)  — Normalised by Month 0"
         fmt = ".0f"
         cmap = "Greens"
 
@@ -99,12 +101,12 @@ def plot_cohort_heatmap(df: pd.DataFrame, metric: str = "revenue") -> None:
         template="plotly_white",
     )
     fig.update_xaxes(side="top")
-    fig.show()
+    return fig
 
 
 def run_cohort_analysis(df: pd.DataFrame) -> None:
     print("=" * 60)
     print("  COHORT ANALYSIS")
     print("=" * 60)
-    plot_cohort_heatmap(df, metric="count")
-    plot_cohort_heatmap(df, metric="revenue")
+    plot_cohort_heatmap(df, metric="count").show()
+    plot_cohort_heatmap(df, metric="revenue").show()
