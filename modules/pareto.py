@@ -216,7 +216,7 @@ def plot_lorenz(df: pd.DataFrame, col: str = "revenue"):
     vals = np.sort(df[col].dropna().values)[::-1]
     cum  = np.cumsum(vals) / vals.sum()
     x    = np.linspace(0, 1, len(cum))
-    gini = 1 - 2 * np.trapezoid(cum, x)
+    gini = 1 - 2 * np.trapz(cum, x)
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=[0,1], y=[0,1], mode="lines",

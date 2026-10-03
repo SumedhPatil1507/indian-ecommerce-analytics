@@ -37,6 +37,7 @@ from core.database import (
     cache_model_result, load_model_result, save_dataset,
 )
 from dashboard.copilot_tab import render_copilot_tab
+from dashboard.style import THEME_CSS, apply_dark_theme
 
 st.set_page_config(page_title=cfg.APP_NAME, page_icon="",
                    layout="wide", initial_sidebar_state="expanded")
@@ -123,6 +124,7 @@ p,span,div,label,li,td,th,h1,h2,h3,h4,h5,h6,
 </style>
 """
 st.markdown(CSS, unsafe_allow_html=True)
+st.markdown(THEME_CSS, unsafe_allow_html=True)
 
 #  Cached live data (1 hour TTL) 
 @st.cache_data(ttl=3600, show_spinner=False)
@@ -226,23 +228,29 @@ c4.metric("Search Interest",   f"{trend_val:.1f}/100" if trend_val else "N/A",
 with st.expander("GDP & CPI history (World Bank)", expanded=False):
     col1,col2 = st.columns(2)
     if not gdp_df.empty:
-        col1.plotly_chart(px.line(gdp_df,x="year",y="value",markers=True,
+        _fig_gdp = px.line(gdp_df,x="year",y="value",markers=True,
             title="India GDP Growth (%)",template="plotly_white",
             labels={"value":"GDP %","year":"Year"},
-            color_discrete_sequence=["#4f46e5"]),use_container_width=True)
+            color_discrete_sequence=["#4f46e5"])
+        _fig_gdp = apply_dark_theme(_fig_gdp)
+        col1.plotly_chart(_fig_gdp,use_container_width=True)
     if not cpi_df.empty:
-        col2.plotly_chart(px.line(cpi_df,x="year",y="value",markers=True,
+        _fig_cpi = px.line(cpi_df,x="year",y="value",markers=True,
             title="India CPI Inflation (%)",template="plotly_white",
             labels={"value":"CPI %","year":"Year"},
-            color_discrete_sequence=["#ef4444"]),use_container_width=True)
+            color_discrete_sequence=["#ef4444"])
+        _fig_cpi = apply_dark_theme(_fig_cpi)
+        col2.plotly_chart(_fig_cpi,use_container_width=True)
     st.caption("Source: World Bank Open Data https://data.worldbank.org/country/india (CC BY 4.0)")
 
 if not trends_df.empty:
     with st.expander("Google Trends - E-commerce search interest (India)", expanded=False):
         tr = trends_df.copy(); tr.index.name = "date"
         tp = tr.reset_index().melt(id_vars="date",var_name="keyword",value_name="interest")
-        st.plotly_chart(px.line(tp,x="date",y="interest",color="keyword",
-            title="Search Interest (0-100)",template="plotly_white"),use_container_width=True)
+        _fig_trends = px.line(tp,x="date",y="interest",color="keyword",
+            title="Search Interest (0-100)",template="plotly_white")
+        _fig_trends = apply_dark_theme(_fig_trends)
+        st.plotly_chart(_fig_trends,use_container_width=True)
         st.caption("Source: Google Trends via pytrends https://github.com/GeneralMills/pytrends (Apache 2.0)")
 
 st.markdown("---")
@@ -449,7 +457,9 @@ with tabs[2]:
         price_recs = run_price_optimizer(dff)
     if not price_recs.empty:
         fig_p = plot_price_optimizer(price_recs)
-        if fig_p: st.plotly_chart(fig_p, use_container_width=True)
+        if fig_p:
+            fig_p = apply_dark_theme(fig_p)
+            st.plotly_chart(fig_p, use_container_width=True)
         total_impact = price_recs["revenue_impact_pct"].sum()
         if total_impact > 0:
             st.success(f"Applying all recommendations could improve revenue by **{total_impact:+.1f}%**")
@@ -474,8 +484,12 @@ with tabs[3]:
     if not at_risk_df.empty:
         fig_r1, fig_r2 = plot_at_risk(at_risk_df)
         c1,c2 = st.columns(2)
-        if fig_r1: c1.plotly_chart(fig_r1, use_container_width=True)
-        if fig_r2: c2.plotly_chart(fig_r2, use_container_width=True)
+        if fig_r1:
+            fig_r1 = apply_dark_theme(fig_r1)
+            c1.plotly_chart(fig_r1, use_container_width=True)
+        if fig_r2:
+            fig_r2 = apply_dark_theme(fig_r2)
+            c2.plotly_chart(fig_r2, use_container_width=True)
         critical = at_risk_df[at_risk_df["risk_label"]=="Critical"]
         if not critical.empty:
             st.error(f"{len(critical)} critical high-value customers need immediate outreach")
@@ -500,7 +514,9 @@ with tabs[4]:
         pred_drift = compute_prediction_drift(dff, reference_months=ref_m, current_months=cur_m)
     if not drift_df.empty:
         fig_d = plot_drift(drift_df)
-        if fig_d: st.plotly_chart(fig_d, use_container_width=True)
+        if fig_d:
+            fig_d = apply_dark_theme(fig_d)
+            st.plotly_chart(fig_d, use_container_width=True)
         drifted = drift_df[drift_df["drift_detected"]]
         if not drifted.empty:
             st.warning(f"{len(drifted)} features show significant drift  model retraining recommended.")
@@ -525,54 +541,78 @@ with tabs[4]:
 with tabs[5]:
     st.subheader("Revenue Trends")
     m = dff.groupby("year_month")["revenue"].sum().reset_index()
-    st.plotly_chart(px.line(m,x="year_month",y="revenue",markers=True,
+    _fig_rev = px.line(m,x="year_month",y="revenue",markers=True,
         title="Total Monthly Revenue",labels={"revenue":"Revenue (Rs)","year_month":"Month"},
-        template="plotly_white",color_discrete_sequence=["#4f46e5"]),use_container_width=True)
+        template="plotly_white",color_discrete_sequence=["#4f46e5"])
+    _fig_rev = apply_dark_theme(_fig_rev)
+    st.plotly_chart(_fig_rev,use_container_width=True)
     c1,c2 = st.columns(2)
-    c1.plotly_chart(px.line(dff.groupby("year_month")["revenue"].mean().reset_index(),
+    _fig_aov = px.line(dff.groupby("year_month")["revenue"].mean().reset_index(),
         x="year_month",y="revenue",markers=True,title="Avg Order Value",
-        labels={"revenue":"AOV (Rs)"},template="plotly_white",color_discrete_sequence=["#22c55e"]),use_container_width=True)
-    c2.plotly_chart(px.line(dff.groupby("year_month")["discount_percent"].mean().reset_index(),
+        labels={"revenue":"AOV (Rs)"},template="plotly_white",color_discrete_sequence=["#22c55e"])
+    _fig_aov = apply_dark_theme(_fig_aov)
+    c1.plotly_chart(_fig_aov,use_container_width=True)
+    _fig_disc = px.line(dff.groupby("year_month")["discount_percent"].mean().reset_index(),
         x="year_month",y="discount_percent",markers=True,title="Avg Discount %",
-        template="plotly_white",color_discrete_sequence=["#ef4444"]),use_container_width=True)
-    st.plotly_chart(px.line(dff.groupby(["year_month","zone"])["revenue"].sum().reset_index(),
+        template="plotly_white",color_discrete_sequence=["#ef4444"])
+    _fig_disc = apply_dark_theme(_fig_disc)
+    c2.plotly_chart(_fig_disc,use_container_width=True)
+    _fig_zone = px.line(dff.groupby(["year_month","zone"])["revenue"].sum().reset_index(),
         x="year_month",y="revenue",color="zone",markers=True,title="Revenue by Zone",
-        template="plotly_white"),use_container_width=True)
-    st.plotly_chart(px.line(dff.groupby(["year_month","brand_type"])["revenue"].sum().reset_index(),
+        template="plotly_white")
+    _fig_zone = apply_dark_theme(_fig_zone)
+    st.plotly_chart(_fig_zone,use_container_width=True)
+    _fig_brand = px.line(dff.groupby(["year_month","brand_type"])["revenue"].sum().reset_index(),
         x="year_month",y="revenue",color="brand_type",markers=True,title="Revenue: Mass vs Premium",
-        template="plotly_white"),use_container_width=True)
+        template="plotly_white")
+    _fig_brand = apply_dark_theme(_fig_brand)
+    st.plotly_chart(_fig_brand,use_container_width=True)
 
 #  TAB 5: Categories 
 with tabs[6]:
     st.subheader("Category & Brand Analysis")
     c1,c2 = st.columns(2)
-    c1.plotly_chart(px.pie(dff.groupby("category")["revenue"].sum().reset_index(),
+    _fig_cat_pie = px.pie(dff.groupby("category")["revenue"].sum().reset_index(),
         names="category",values="revenue",title="Revenue by Category",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    c2.plotly_chart(px.pie(dff.groupby("brand_type")["revenue"].sum().reset_index(),
+        template="plotly_white")
+    _fig_cat_pie = apply_dark_theme(_fig_cat_pie)
+    c1.plotly_chart(_fig_cat_pie,use_container_width=True)
+    _fig_brand_pie = px.pie(dff.groupby("brand_type")["revenue"].sum().reset_index(),
         names="brand_type",values="revenue",title="Mass vs Premium",hole=0.45,
-        template="plotly_white"),use_container_width=True)
+        template="plotly_white")
+    _fig_brand_pie = apply_dark_theme(_fig_brand_pie)
+    c2.plotly_chart(_fig_brand_pie,use_container_width=True)
     metric = st.selectbox("Metric",["revenue","final_price","units_sold","discount_percent"])
-    st.plotly_chart(px.bar(dff.groupby("category")[metric].mean().reset_index().sort_values(metric,ascending=False),
+    _fig_metric_bar = px.bar(dff.groupby("category")[metric].mean().reset_index().sort_values(metric,ascending=False),
         x="category",y=metric,color="category",title=f"Avg {metric} by Category",
-        template="plotly_white",color_discrete_sequence=px.colors.qualitative.Set2),use_container_width=True)
-    st.plotly_chart(px.bar(dff.groupby(["year_month","sales_event"])["revenue"].sum().reset_index(),
+        template="plotly_white",color_discrete_sequence=px.colors.qualitative.Set2)
+    _fig_metric_bar = apply_dark_theme(_fig_metric_bar)
+    st.plotly_chart(_fig_metric_bar,use_container_width=True)
+    _fig_festival = px.bar(dff.groupby(["year_month","sales_event"])["revenue"].sum().reset_index(),
         x="year_month",y="revenue",color="sales_event",title="Festival vs Normal Revenue",
-        template="plotly_white",barmode="group"),use_container_width=True)
+        template="plotly_white",barmode="group")
+    _fig_festival = apply_dark_theme(_fig_festival)
+    st.plotly_chart(_fig_festival,use_container_width=True)
 
 #  TAB 6: Regional 
 with tabs[7]:
     st.subheader("Regional Analysis")
-    st.plotly_chart(px.bar(dff.groupby("state")["revenue"].sum().nlargest(15).reset_index(),
+    _fig_states = px.bar(dff.groupby("state")["revenue"].sum().nlargest(15).reset_index(),
         x="revenue",y="state",orientation="h",title="Top 15 States by Revenue",
-        template="plotly_white",color="revenue",color_continuous_scale="Blues"),use_container_width=True)
+        template="plotly_white",color="revenue",color_continuous_scale="Blues")
+    _fig_states = apply_dark_theme(_fig_states)
+    st.plotly_chart(_fig_states,use_container_width=True)
     c1,c2 = st.columns(2)
-    c1.plotly_chart(px.pie(dff.groupby("zone")["revenue"].sum().reset_index(),
+    _fig_zone_pie = px.pie(dff.groupby("zone")["revenue"].sum().reset_index(),
         names="zone",values="revenue",title="Revenue by Zone",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    c2.plotly_chart(px.bar(dff.groupby("zone")["units_sold"].mean().reset_index(),
+        template="plotly_white")
+    _fig_zone_pie = apply_dark_theme(_fig_zone_pie)
+    c1.plotly_chart(_fig_zone_pie,use_container_width=True)
+    _fig_zone_units = px.bar(dff.groupby("zone")["units_sold"].mean().reset_index(),
         x="zone",y="units_sold",color="zone",title="Avg Units by Zone",
-        template="plotly_white"),use_container_width=True)
+        template="plotly_white")
+    _fig_zone_units = apply_dark_theme(_fig_zone_units)
+    c2.plotly_chart(_fig_zone_units,use_container_width=True)
 
 #  TAB 7: Inventory 
 with tabs[8]:
@@ -586,9 +626,11 @@ with tabs[8]:
         "SLOW MOVER - Review Listing":"#3b82f6",
         "HEALTHY":                   "#22c55e",
     }
-    st.plotly_chart(px.scatter(alerts,x="avg_discount",y="avg_units_sold",color="alert_level",
+    _fig_inv = px.scatter(alerts,x="avg_discount",y="avg_units_sold",color="alert_level",
         size="high_pressure_pct",hover_data=["category","zone","recommendation"],
-        color_discrete_map=cmap,title="Inventory Alert Dashboard",template="plotly_white"),use_container_width=True)
+        color_discrete_map=cmap,title="Inventory Alert Dashboard",template="plotly_white")
+    _fig_inv = apply_dark_theme(_fig_inv)
+    st.plotly_chart(_fig_inv,use_container_width=True)
     af = st.multiselect("Filter alerts",list(cmap.keys()),default=list(cmap.keys()))
     st.dataframe(alerts[alerts["alert_level"].isin(af)]
         [["category","zone","avg_units_sold","avg_discount","alert_level","recommendation"]],
@@ -608,13 +650,19 @@ with tabs[9]:
     else:
         st.caption("CLV loaded from Supabase cache (< 24h old).")
     c1,c2 = st.columns(2)
-    c1.plotly_chart(px.histogram(clv_df,x="clv",color="clv_tier",nbins=50,
-        title="CLV Distribution",template="plotly_white",marginal="box"),use_container_width=True)
-    c2.plotly_chart(px.pie(clv_df.groupby("clv_tier")["clv"].sum().reset_index(),
+    _fig_clv_hist = px.histogram(clv_df,x="clv",color="clv_tier",nbins=50,
+        title="CLV Distribution",template="plotly_white",marginal="box")
+    _fig_clv_hist = apply_dark_theme(_fig_clv_hist)
+    c1.plotly_chart(_fig_clv_hist,use_container_width=True)
+    _fig_clv_pie = px.pie(clv_df.groupby("clv_tier")["clv"].sum().reset_index(),
         names="clv_tier",values="clv",title="CLV Share by Tier",hole=0.45,
-        template="plotly_white"),use_container_width=True)
-    st.plotly_chart(px.scatter(clv_df,x="frequency",y="clv",color="clv_tier",
-        opacity=0.6,size="monetary",title="Frequency vs CLV",template="plotly_white"),use_container_width=True)
+        template="plotly_white")
+    _fig_clv_pie = apply_dark_theme(_fig_clv_pie)
+    c2.plotly_chart(_fig_clv_pie,use_container_width=True)
+    _fig_clv_scatter = px.scatter(clv_df,x="frequency",y="clv",color="clv_tier",
+        opacity=0.6,size="monetary",title="Frequency vs CLV",template="plotly_white")
+    _fig_clv_scatter = apply_dark_theme(_fig_clv_scatter)
+    st.plotly_chart(_fig_clv_scatter,use_container_width=True)
     st.dataframe(clv_df.groupby("clv_tier")["clv"].agg(count="count",mean_clv="mean",total_clv="sum").round(2),
         use_container_width=True)
 
@@ -635,19 +683,25 @@ with tabs[10]:
         cache_note = "fresh"
         st.caption("Anomaly scores computed fresh and cached to Supabase (7-day TTL).")
     c1,c2 = st.columns(2)
-    c1.plotly_chart(px.scatter(anom,x="log_units_sold",y="log_revenue",color="confirmed_anomaly",
+    _fig_anom1 = px.scatter(anom,x="log_units_sold",y="log_revenue",color="confirmed_anomaly",
         color_discrete_map={True:"#ef4444",False:"#94a3b8"},opacity=0.5,
         title="log(Units) vs log(Revenue)",hover_data=["category","zone","discount_percent"],
-        template="plotly_white"),use_container_width=True)
-    c2.plotly_chart(px.scatter(anom,x="discount_percent",y="log_final_price",color="confirmed_anomaly",
+        template="plotly_white")
+    _fig_anom1 = apply_dark_theme(_fig_anom1)
+    c1.plotly_chart(_fig_anom1,use_container_width=True)
+    _fig_anom2 = px.scatter(anom,x="discount_percent",y="log_final_price",color="confirmed_anomaly",
         color_discrete_map={True:"#ef4444",False:"#e2e8f0"},opacity=0.55,
         title="Discount % vs log(Final Price)",hover_data=["category","zone"],
-        template="plotly_white"),use_container_width=True)
+        template="plotly_white")
+    _fig_anom2 = apply_dark_theme(_fig_anom2)
+    c2.plotly_chart(_fig_anom2,use_container_width=True)
     n = anom["confirmed_anomaly"].sum()
     st.info(f"Confirmed anomalies (>=2 detectors): **{n:,}** ({n/len(anom):.2%}) | Source: {cache_note}")
-    st.plotly_chart(px.bar(
+    _fig_anom_bar = px.bar(
         anom[anom["confirmed_anomaly"]].groupby("category").size().reset_index(name="count").sort_values("count",ascending=False),
-        x="category",y="count",color="category",title="Anomalies by Category",template="plotly_white"),
+        x="category",y="count",color="category",title="Anomalies by Category",template="plotly_white")
+    _fig_anom_bar = apply_dark_theme(_fig_anom_bar)
+    st.plotly_chart(_fig_anom_bar,
         use_container_width=True)
 
 #  TAB 10: Cohort 
@@ -657,14 +711,18 @@ with tabs[11]:
     c1,c2 = st.columns(2)
     pivot = build_cohort_table(dff,metric="count")
     ret = (pivot.div(pivot[0],axis=0)*100).round(1)
-    c1.plotly_chart(px.imshow(ret,color_continuous_scale="Blues",title="Retention Rate (%) - Orders",
+    _fig_cohort1 = px.imshow(ret,color_continuous_scale="Blues",title="Retention Rate (%) - Orders",
         labels={"x":"Months since first purchase","y":"Cohort","color":"Retention %"},
-        text_auto=".0f",template="plotly_white"),use_container_width=True)
+        text_auto=".0f",template="plotly_white")
+    _fig_cohort1 = apply_dark_theme(_fig_cohort1)
+    c1.plotly_chart(_fig_cohort1,use_container_width=True)
     pivot_r = build_cohort_table(dff,metric="revenue")
     ret_r = (pivot_r.div(pivot_r[0],axis=0)*100).round(1)
-    c2.plotly_chart(px.imshow(ret_r,color_continuous_scale="Greens",title="Revenue Retention (%)",
+    _fig_cohort2 = px.imshow(ret_r,color_continuous_scale="Greens",title="Revenue Retention (%)",
         labels={"x":"Months since first purchase","y":"Cohort","color":"Retention %"},
-        text_auto=".0f",template="plotly_white"),use_container_width=True)
+        text_auto=".0f",template="plotly_white")
+    _fig_cohort2 = apply_dark_theme(_fig_cohort2)
+    c2.plotly_chart(_fig_cohort2,use_container_width=True)
 
 #  TAB 11: Pareto 
 with tabs[12]:
@@ -679,16 +737,19 @@ with tabs[12]:
     fig.update_layout(title="Pareto - Revenue by Category (80/20 Rule)",template="plotly_white")
     fig.update_yaxes(title_text="Revenue (Rs)",secondary_y=False)
     fig.update_yaxes(title_text="Cumulative %",secondary_y=True)
+    fig = apply_dark_theme(fig)
     st.plotly_chart(fig,use_container_width=True)
-    st.plotly_chart(px.sunburst(
+    _fig_sunburst = px.sunburst(
         dff.groupby(["category","zone","brand_type"])["revenue"].sum().reset_index(),
         path=["category","zone","brand_type"],values="revenue",
         title="Revenue Sunburst - Category > Zone > Brand",template="plotly_white",
-        color="revenue",color_continuous_scale="Blues"),use_container_width=True)
+        color="revenue",color_continuous_scale="Blues")
+    _fig_sunburst = apply_dark_theme(_fig_sunburst)
+    st.plotly_chart(_fig_sunburst,use_container_width=True)
     vals = np.sort(dff["revenue"].dropna().values)[::-1]
     cum  = np.cumsum(vals)/vals.sum()
     x    = np.linspace(0,1,len(cum))
-    gini = round(1-2*np.trapezoid(cum,x),3)
+    gini = round(1-2*np.trapz(cum,x),3)
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(x=[0,1],y=[0,1],mode="lines",line=dict(dash="dash",color="#94a3b8"),name="Perfect equality"))
     fig2.add_trace(go.Scatter(x=x,y=cum,mode="lines",fill="tozeroy",fillcolor="rgba(79,70,229,.10)",
@@ -696,6 +757,7 @@ with tabs[12]:
     fig2.update_layout(title=f"Lorenz Curve - Revenue Concentration (Gini={gini})",
         xaxis_title="Cumulative share of orders",yaxis_title="Cumulative share of revenue",
         template="plotly_white")
+    fig2 = apply_dark_theme(fig2)
     st.plotly_chart(fig2,use_container_width=True)
 
 
@@ -770,8 +832,10 @@ with tabs[15]:
             if isinstance(figs, list):
                 for f in figs:
                     if f is not None:
+                        f = apply_dark_theme(f)
                         st.plotly_chart(f, use_container_width=True)
             else:
+                figs = apply_dark_theme(figs)
                 st.plotly_chart(figs, use_container_width=True)
 
         st.subheader("Distributions")
@@ -823,6 +887,7 @@ with tabs[16]:
         import modules.time_series as ts_mod
         trend_figs = ts_mod.plot_trends(dff)
         for f in trend_figs:
+            f = apply_dark_theme(f)
             st.plotly_chart(f, use_container_width=True)
     except Exception as e:
         st.warning(f"Trend plots error: {e}")
@@ -831,6 +896,7 @@ with tabs[16]:
     try:
         import modules.time_series as ts_mod
         decomp_fig = ts_mod.plot_decomposition(dff)
+        decomp_fig = apply_dark_theme(decomp_fig)
         st.plotly_chart(decomp_fig, use_container_width=True)
     except ImportError as e:
         st.info(f"Install statsmodels for seasonal decomposition: {e}")
@@ -841,6 +907,7 @@ with tabs[16]:
     try:
         import modules.time_series as ts_mod
         prophet_fig, _ = ts_mod.forecast_prophet(dff, periods=int(forecast_horizon))
+        prophet_fig = apply_dark_theme(prophet_fig)
         st.plotly_chart(prophet_fig, use_container_width=True)
     except ImportError as e:
         st.info(f"Install prophet for Prophet forecasting: pip install prophet. Error: {e}")
@@ -851,6 +918,7 @@ with tabs[16]:
     try:
         import modules.time_series as ts_mod
         sarima_fig, _ = ts_mod.forecast_sarima(dff, periods=int(forecast_horizon))
+        sarima_fig = apply_dark_theme(sarima_fig)
         st.plotly_chart(sarima_fig, use_container_width=True)
     except ImportError as e:
         st.info(f"Install statsmodels for SARIMA forecasting. Error: {e}")
@@ -875,6 +943,7 @@ with tabs[17]:
             st.subheader("Model Comparison Plots")
             comparison_figs = models_mod.plot_comparison(ml_output)
             for f in comparison_figs:
+                f = apply_dark_theme(f)
                 st.plotly_chart(f, use_container_width=True)
 
             st.subheader("Permutation Feature Importance (Random Forest)")
@@ -888,6 +957,7 @@ with tabs[17]:
                     perm_fig = expl_mod.plot_permutation_importance(
                         rf_model, X_te_t, y_te, feat_names, top_n=15
                     )
+                    perm_fig = apply_dark_theme(perm_fig)
                     st.plotly_chart(perm_fig, use_container_width=True)
             except Exception as e:
                 st.warning(f"Permutation importance error: {e}")

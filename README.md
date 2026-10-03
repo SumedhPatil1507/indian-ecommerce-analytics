@@ -1,4 +1,4 @@
-# IndiaCommerce Analytics v4.0
+# IndiaCommerce Analytics v4.2
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/)
 
@@ -85,8 +85,17 @@ uvicorn api.main:app --reload --port 8000
 
 Key additional dependency: `lifetimes>=0.12.1` (for BG/NBD CLV computation)
 
-## Supabase Setup (optional)
+**NumPy compatibility:** Requires NumPy ≥ 1.x (tested on 1.26.4 and 2.x). Uses `np.trapz` for compatibility across both major versions.
 
+## Visual Theme
+
+The dashboard uses a dark indigo theme for improved contrast and readability:
+- **Background:** Deep navy (`#0F172A`) with slate card surfaces (`#1E293B`)
+- **Tab bar:** Inactive tabs in slate, active tab highlighted in indigo (`#6366F1`) with white text
+- **Charts:** All Plotly charts use a consistent dark template with slate backgrounds and light axis labels
+- **Metrics:** Card-style metric tiles with visible borders on the dark background
+
+## Supabase Setup (optional)
 1. Create project at [supabase.com](https://supabase.com) — name: `indiacommerce-analytics`, region: `ap-south-1`
 2. Run `supabase_schema.sql` in Supabase SQL Editor
 3. Create Storage bucket named `datasets` (set to private)

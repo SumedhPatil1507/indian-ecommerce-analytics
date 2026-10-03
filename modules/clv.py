@@ -77,8 +77,8 @@ def compute_clv(
     rfm = build_rfm(df)
 
     if not _LIFETIMES_OK:
-        print("  lifetimes not installed  using simple RFM CLV.")
-        print("   Install with: pip install lifetimes")
+        import logging as _logging
+        _logging.getLogger(__name__).warning("lifetimes not installed — using simple RFM CLV. Install with: pip install lifetimes")
         return _simple_clv(rfm, time_horizon, margin)
 
     # lifetimes expects: frequency, recency (days), T (days), monetary_value

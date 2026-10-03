@@ -87,3 +87,120 @@ CUSTOM_CSS = '''<style>
     margin-bottom: 20px;
 }
 </style>'''
+
+import plotly.graph_objects as go
+
+THEME_CSS = """
+<style>
+/* Base & background */
+[data-testid="stAppViewContainer"] { background: #0F172A !important; }
+[data-testid="stSidebar"]          { background: #1E293B !important; border-right: 1px solid #334155 !important; }
+
+/* Tab bar */
+button[data-baseweb="tab"] {
+    background: #1E293B !important;
+    color: #94A3B8 !important;
+    border-radius: 8px 8px 0 0 !important;
+    font-weight: 600 !important;
+    font-size: 0.82rem !important;
+    padding: 8px 14px !important;
+    border: 1px solid #334155 !important;
+    border-bottom: none !important;
+}
+button[data-baseweb="tab"][aria-selected="true"] {
+    background: #6366F1 !important;
+    color: #FFFFFF !important;
+    border-color: #6366F1 !important;
+}
+button[data-baseweb="tab"]:hover {
+    background: #334155 !important;
+    color: #E2E8F0 !important;
+}
+
+/* Metric cards */
+[data-testid="metric-container"] {
+    background: #1E293B !important;
+    border: 1px solid #334155 !important;
+    border-radius: 12px !important;
+    padding: 12px 16px !important;
+}
+[data-testid="metric-container"] label { color: #94A3B8 !important; font-size: 0.78rem !important; }
+[data-testid="metric-container"] [data-testid="stMetricValue"] { color: #F1F5F9 !important; font-size: 1.6rem !important; font-weight: 700 !important; }
+[data-testid="metric-container"] [data-testid="stMetricDelta"] { font-size: 0.82rem !important; }
+
+/* Headings & text */
+h1, h2, h3 { color: #F1F5F9 !important; }
+p, li, label { color: #CBD5E1 !important; }
+.stCaption  { color: #64748B !important; }
+
+/* Selectbox, multiselect, input */
+[data-baseweb="select"] > div,
+[data-baseweb="input"]  > div  { background: #1E293B !important; border-color: #475569 !important; color: #F1F5F9 !important; }
+
+/* Dataframe */
+[data-testid="stDataFrame"] { border: 1px solid #334155 !important; border-radius: 8px !important; }
+
+/* Expander */
+[data-testid="stExpander"] { background: #1E293B !important; border: 1px solid #334155 !important; border-radius: 8px !important; }
+
+/* Button */
+.stButton > button {
+    background: #6366F1 !important;
+    color: #FFFFFF !important;
+    border-radius: 8px !important;
+    border: none !important;
+    font-weight: 600 !important;
+    padding: 8px 20px !important;
+}
+.stButton > button:hover { background: #4F46E5 !important; }
+
+/* Info / warning / error boxes */
+[data-testid="stAlert"] { border-radius: 8px !important; }
+
+/* Sidebar labels */
+[data-testid="stSidebar"] label { color: #CBD5E1 !important; }
+[data-testid="stSidebar"] h1, [data-testid="stSidebar"] h2 { color: #F1F5F9 !important; }
+
+/* Card divider */
+hr { border-color: #334155 !important; }
+
+/* General text override for dark background */
+html, body, [class*="css"], .stApp, .main, .block-container,
+p, span, div, label, li, td, th, h4, h5, h6,
+.stMarkdown, .stMarkdown p, .stMarkdown span,
+[data-testid="stMarkdownContainer"],
+[data-testid="stMarkdownContainer"] p,
+[data-testid="stMarkdownContainer"] span,
+[data-testid="stMarkdownContainer"] li,
+.stSelectbox label, .stMultiSelect label,
+.stSlider label, .stFileUploader label,
+.stCheckbox label, .stRadio label,
+.stExpander summary, .stExpander p,
+[data-testid="stExpander"] p,
+[data-testid="stExpander"] span,
+[data-testid="stCaptionContainer"] p {
+  color: #CBD5E1 !important;
+}
+</style>
+"""
+
+
+def apply_dark_theme(fig: go.Figure) -> go.Figure:
+    """Apply consistent dark Plotly theme to any figure."""
+    fig.update_layout(
+        paper_bgcolor="#1E293B",
+        plot_bgcolor="#0F172A",
+        font=dict(
+            color="#F1F5F9",
+            family="Inter, system-ui, sans-serif",
+        ),
+        legend=dict(
+            bgcolor="#1E293B",
+            bordercolor="#475569",
+            borderwidth=1,
+            font=dict(color="#F1F5F9"),
+        ),
+    )
+    fig.update_xaxes(gridcolor="#334155", zerolinecolor="#334155", tickfont=dict(color="#94A3B8"), title_font=dict(color="#CBD5E1"))
+    fig.update_yaxes(gridcolor="#334155", zerolinecolor="#334155", tickfont=dict(color="#94A3B8"), title_font=dict(color="#CBD5E1"))
+    return fig

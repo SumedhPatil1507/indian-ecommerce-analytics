@@ -656,7 +656,7 @@ async def get_pareto_analysis(tenant: dict = Depends(get_current_tenant)):
     vals = np.sort(df["revenue"].dropna().values)[::-1]
     cum = np.cumsum(vals) / vals.sum()
     x = np.linspace(0, 1, len(cum))
-    gini = round(1 - 2 * np.trapezoid(cum, x), 3) if len(cum) > 1 else 0.0
+    gini = round(1 - 2 * np.trapz(cum, x), 3) if len(cum) > 1 else 0.0
     
     # Subsample Lorenz for fast transfer (max 500 points)
     step = max(1, len(cum) // 500)
