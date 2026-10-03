@@ -25,7 +25,7 @@ Connect any e-commerce platform — all connectors normalise to the same interna
 | Generic File | CSV, TSV, Excel, JSON, Parquet | `load_any(file, filename)` |
 | Simulation Sandbox | Live macro-calibrated synthetic data | `generate_simulation(...)` |
 
-### 14 Analytics Tabs
+### 17 Analytics Tabs
 
 | Tab | What it does |
 |---|---|
@@ -42,6 +42,9 @@ Connect any e-commerce platform — all connectors normalise to the same interna
 | Anomalies | Isolation Forest + DBSCAN + Z-score (Supabase cached, 7-day TTL) |
 | Cohort | Retention rate + revenue retention heatmaps |
 | Pareto | 80/20 chart, sunburst, Lorenz curve + Gini coefficient |
+| 🔍 Exploratory Analysis | Interactive histograms, box plots, violin plots, pie charts, count plots |
+| 📈 Forecasting | Revenue trends, seasonal decomposition, Prophet + SARIMA forecasts |
+| 🤖 ML Models | Linear/Tree/RF/XGBoost/Neural Net comparison, permutation importance |
 | Operational Actions | Approve price changes, export at-risk cohort, view Supabase action log |
 
 ### Live Data Sources
@@ -79,6 +82,8 @@ streamlit run dashboard/app.py
 # Run API (optional, docs at http://localhost:8000/docs)
 uvicorn api.main:app --reload --port 8000
 ```
+
+Key additional dependency: `lifetimes>=0.12.1` (for BG/NBD CLV computation)
 
 ## Supabase Setup (optional)
 
@@ -119,11 +124,17 @@ ecommerce-analytics/
 │   ├── cohort.py          # Cohort retention heatmaps
 │   ├── inventory_alerts.py# Velocity-based inventory alerts
 │   └── export.py          # PDF + Excel export
+│   ├── copilot.py         # Merchant Insights Copilot (keyword planning + TF-IDF RAG)
+│   ├── price_elasticity.py# Price elasticity analysis (log-log regression)
+│   ├── eda.py             # Exploratory Data Analysis (distributions, categorical, boxplots)
+│   ├── models.py          # ML model training + comparison (LR/DT/RF/XGBoost/MLP)
+│   ├── explainability.py  # SHAP + permutation importance + LIME
+│   └── time_series.py     # Time series trends + Prophet + SARIMA forecasting
 ├── core/
 │   ├── config.py          # App + Supabase configuration
 │   └── database.py        # Supabase persistence + model result caching
 ├── dashboard/
-│   └── app.py             # Streamlit dashboard (14 tabs, no login required)
+│   └── app.py             # Streamlit dashboard (17 tabs, no login required)
 ├── api/
 │   └── main.py            # FastAPI REST endpoints (optional)
 ├── supabase_schema.sql    # Complete Supabase schema
@@ -170,3 +181,10 @@ If `OPENAI_API_KEY` is not set, the Copilot runs in **demo mode**: it still exec
 - "What discount should I offer on Electronics to maximise revenue?"
 - "Are there any anomalous orders or fraud signals this quarter?"
 - "How does customer lifetime value compare across product categories?"
+
+### New Analytics Tabs (v4.1)
+
+Three new tabs have been added to the dashboard:
+- **🔍 Exploratory Analysis** — Interactive distributions, categorical plots, box plots, violin plots, and pie charts for deep data exploration.
+- **📈 Forecasting** — Revenue trend plots, seasonal decomposition, and Prophet + SARIMA forecasting with configurable horizon.
+- **🤖 ML Models** — Train and compare Linear Regression, Decision Tree, Random Forest, XGBoost, and Neural Network models with permutation feature importance.
