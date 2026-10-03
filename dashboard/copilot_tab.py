@@ -4,6 +4,7 @@ Merchant Insights Copilot  Streamlit UI.
 """
 from __future__ import annotations
 import os
+import re
 import time
 
 import pandas as pd
@@ -107,25 +108,7 @@ def render_copilot_tab(df: pd.DataFrame, filters: dict | None = None) -> None:
                 unsafe_allow_html=True,
             )
             # Answer bubble
-            answer_html = turn["answer"].replace(
-                "[price_optimizer]", "**[price_optimizer]**"
-            ).replace(
-                "[at_risk]", "**[at_risk]**"
-            ).replace(
-                "[clv]", "**[clv]**"
-            ).replace(
-                "[anomaly]", "**[anomaly]**"
-            ).replace(
-                "[insights]", "**[insights]**"
-            ).replace(
-                "[inventory_alerts]", "**[inventory_alerts]**"
-            ).replace(
-                "[price_elasticity]", "**[price_elasticity]**"
-            ).replace(
-                "[cohort]", "**[cohort]**"
-            ).replace(
-                "[time_series]", "**[time_series]**"
-            )
+            answer_html = re.sub(r'\[(\w+)\]', r'**[\1]**', turn["answer"])
             st.markdown(
                 f"<div style='background:#eef2ff;border-radius:8px;padding:12px 16px;"
                 f"margin-bottom:8px;border-left:3px solid #4f46e5'>"
