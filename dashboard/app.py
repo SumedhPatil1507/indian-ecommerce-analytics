@@ -749,7 +749,9 @@ with tabs[12]:
     vals = np.sort(dff["revenue"].dropna().values)[::-1]
     cum  = np.cumsum(vals)/vals.sum()
     x    = np.linspace(0,1,len(cum))
-    gini = round(1-2*np.trapz(cum,x),3)
+    # np.trapz removed in NumPy 2.0; np.trapezoid added in NumPy 2.0
+    _trapz = getattr(np, "trapezoid", None) or getattr(np, "trapz", None)
+    gini = round(1-2*_trapz(cum,x),3)
     fig2 = go.Figure()
     fig2.add_trace(go.Scatter(x=[0,1],y=[0,1],mode="lines",line=dict(dash="dash",color="#94a3b8"),name="Perfect equality"))
     fig2.add_trace(go.Scatter(x=x,y=cum,mode="lines",fill="tozeroy",fillcolor="rgba(79,70,229,.10)",

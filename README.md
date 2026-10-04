@@ -94,7 +94,7 @@ streamlit run dashboard/app.py
 
 ### NumPy Compatibility
 
-Uses `np.trapz` (not `np.trapezoid`) — works on NumPy 1.x (1.26.4) and 2.x.
+Uses a version-agnostic trapezoid shim (`getattr(np, "trapezoid", None) or getattr(np, "trapz", None)`) that works on both NumPy 1.x (`np.trapz`) and NumPy 2.x (`np.trapezoid`), since each version removed the other's name.
 
 ## Visual Theme
 
