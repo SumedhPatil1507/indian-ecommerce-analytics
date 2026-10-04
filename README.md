@@ -1,4 +1,4 @@
-# IndiaCommerce Analytics v4.2
+# IndiaCommerce Analytics v4.3
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/)
 
@@ -73,19 +73,28 @@ When `SUPABASE_URL` + `SUPABASE_ANON_KEY` are configured, the platform persists:
 ```bash
 git clone https://github.com/SumedhPatil1507/indian-ecommerce-analytics
 cd ecommerce-analytics
-bash setup_env.sh
-source .venv/bin/activate
+
+# Create a Python 3.11 virtual environment (required — see Python version note below)
+python3.11 -m venv .venv
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
+
+pip install -r requirements.txt
 
 # Run dashboard (opens at http://localhost:8501)
 streamlit run dashboard/app.py
-
-# Run API (optional, docs at http://localhost:8000/docs)
-uvicorn api.main:app --reload --port 8000
 ```
 
-Key additional dependency: `lifetimes>=0.12.1` (for BG/NBD CLV computation)
+### Python Version
 
-**NumPy compatibility:** Requires NumPy ≥ 1.x (tested on 1.26.4 and 2.x). Uses `np.trapz` for compatibility across both major versions.
+**Python 3.11 is required.** A `runtime.txt` file pins Streamlit Cloud to Python 3.11 automatically.
+
+- `lifetimes` max published version is `0.11.3` — pinned to `==0.11.3` in `requirements.txt`.
+- `prophet` requires `pystan` which has no Python 3.14 wheels.
+- Run locally with Python 3.11 to match the Cloud environment exactly.
+
+### NumPy Compatibility
+
+Uses `np.trapz` (not `np.trapezoid`) — works on NumPy 1.x (1.26.4) and 2.x.
 
 ## Visual Theme
 
@@ -107,14 +116,16 @@ SUPABASE_ANON_KEY = "eyJ..."
 SUPABASE_SERVICE_KEY = "eyJ..."
 ```
 
-## GitHub Update Commands
+## GitHub Update Commands (VS Code Terminal)
 
-```bash
-cd C:\Users\Sumedh\projects\Indian-ecommerce-project\ecommerce-analytics
+```powershell
+cd "C:\Users\Sumedh\projects\Indian-ecommerce-project\ecommerce-analytics"
 git add .
 git commit -m "your message"
 git push
 ```
+
+Streamlit Cloud auto-redeploys within ~30 seconds of a push to `main`.
 
 ## Project Structure
 
@@ -149,7 +160,8 @@ ecommerce-analytics/
 ├── supabase_schema.sql    # Complete Supabase schema
 ├── .streamlit/config.toml # Streamlit theme (dark text, indigo accent)
 ├── .env.example           # Environment variable template
-└── requirements.txt
+└── requirements.txt       # Streamlit Cloud–compatible deps (Python 3.11, lifetimes==0.11.3)
+└── runtime.txt            # Pins Python 3.11 on Streamlit Cloud
 
 ```
 
