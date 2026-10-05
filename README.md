@@ -1,211 +1,346 @@
-# IndiaCommerce Analytics v4.3
+<div align="center">
+
+# 🛒 IndiaCommerce Analytics
+
+### Production-grade e-commerce intelligence platform for Indian markets
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/)
+[![Python 3.11](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
+[![NumPy](https://img.shields.io/badge/NumPy-1.26%2B-013243?logo=numpy)](https://numpy.org)
+[![Plotly](https://img.shields.io/badge/Plotly-Interactive-3F4F75?logo=plotly)](https://plotly.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-22C55E)](LICENSE)
 
-**Live Dashboard:** https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/
-**GitHub:** https://github.com/SumedhPatil1507/indian-ecommerce-analytics
-**Dataset:** https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth
-
-Production-grade e-commerce analytics platform. Runs entirely on Streamlit Cloud — no external servers or login required. Upload your data and get instant insights powered by live macro signals.
-
-> **Architecture:** Pure Streamlit + in-process Python analytics. No FastAPI server or Celery workers needed on Streamlit Cloud. Supabase is fully optional (enables result caching and operational logging when configured).
+**[🚀 Live Demo](https://indian-ecommerce-analytics-arxf6zhgntbmhby5vcvsgy.streamlit.app/) · [📦 Dataset](https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth) · [🐙 GitHub](https://github.com/SumedhPatil1507/indian-ecommerce-analytics)**
 
 ---
 
-## What's Inside
+*Upload your data → get instant AI-powered insights across 18 interactive analytics tabs. No login. No servers. Runs entirely on Streamlit Cloud.*
 
-### Data Connector Matrix (Tab 0)
-Connect any e-commerce platform — all connectors normalise to the same internal schema:
+</div>
 
-| Connector | Source | Function |
-|---|---|---|
-| Shopify | order/create webhook | `from_shopify_webhook(payload)` |
-| Amazon Seller Central | SP-API Orders v0 | `from_amazon_orders(payload)` |
-| WooCommerce | REST API / DB dump | `from_woocommerce(payload)` |
-| Generic File | CSV, TSV, Excel, JSON, Parquet | `load_any(file, filename)` |
-| Simulation Sandbox | Live macro-calibrated synthetic data | `generate_simulation(...)` |
+---
 
-### 17 Analytics Tabs
+## ✨ What's Inside
 
-| Tab | What it does |
-|---|---|
-| Data Connector Matrix | Connect Shopify/Amazon/WooCommerce, validate schema, run Simulation Sandbox |
-| Executive Summary | Auto-written narrative, KPIs, risks, opportunities + PDF/Excel export |
-| Price Optimizer | Lerner-index optimal discount per category, approve with Supabase logging |
-| At-Risk Customers | RFM churn scoring, export cohort CSV for Klaviyo/SendGrid |
-| Model Drift | PSI feature drift + R2 prediction degradation monitoring |
-| Revenue Trends | Monthly revenue, AOV, discount trend, zone + brand breakdown |
-| Categories | Revenue mix, festival vs normal, metric selector |
-| Regional | Top 15 states, zone pie, units by zone |
-| Inventory | Alert system with scatter dashboard + filterable table |
-| CLV | BG/NBD CLV tiers, distribution, frequency scatter (Supabase cached) |
-| Anomalies | Isolation Forest + DBSCAN + Z-score (Supabase cached, 7-day TTL) |
-| Cohort | Retention rate + revenue retention heatmaps |
-| Pareto | 80/20 chart, sunburst, Lorenz curve + Gini coefficient |
-| 🔍 Exploratory Analysis | Interactive histograms, box plots, violin plots, pie charts, count plots |
-| 📈 Forecasting | Revenue trends, seasonal decomposition, Prophet + SARIMA forecasts |
-| 🤖 ML Models | Linear/Tree/RF/XGBoost/Neural Net comparison, permutation importance |
-| Operational Actions | Approve price changes, export at-risk cohort, view Supabase action log |
+> A full analytics stack — from raw order data to forecasts, ML models, and a conversational AI copilot — in a single Streamlit app.
 
-### Live Data Sources
+<table>
+<tr>
+<td width="50%">
 
-| Source | Data | License |
-|---|---|---|
-| [World Bank Open Data](https://data.worldbank.org/) | India GDP growth + CPI inflation | CC BY 4.0 |
-| [fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api) | Live USD/INR rate (3-source waterfall) | CC0 |
-| [Google Trends via pytrends](https://github.com/GeneralMills/pytrends) | E-commerce search interest India | Apache 2.0 |
+**📊 Analytics Modules**
+- Revenue trends, AOV, regional breakdown
+- Price optimisation (Lerner-index)
+- At-risk customer RFM scoring
+- Customer Lifetime Value (BG/NBD)
+- Anomaly detection (3 algorithms)
+- Cohort retention heatmaps
+- Pareto / Lorenz / Gini analysis
+- Inventory velocity alerts
 
-### Supabase Operational Persistence (optional)
+</td>
+<td width="50%">
 
-When `SUPABASE_URL` + `SUPABASE_ANON_KEY` are configured, the platform persists:
+**🤖 AI & ML**
+- Merchant Insights Copilot (NLP + RAG)
+- Time-series forecasting (Prophet + SARIMA)
+- ML model comparison (5 algorithms)
+- SHAP / permutation importance
+- Model drift monitoring (PSI)
+- Price elasticity engine (log-log OLS)
+- Exploratory data analysis suite
+
+</td>
+</tr>
+</table>
+
+---
+
+## 🗂️ 18 Analytics Tabs
+
+| # | Tab | What it does |
+|---|-----|-------------|
+| 0 | **Data Connector Matrix** | Connect Shopify · Amazon · WooCommerce · CSV/Excel · Simulation Sandbox |
+| 1 | **Executive Summary** | Auto-written narrative, KPIs, risks, opportunities + PDF/Excel export |
+| 2 | **Price Optimizer** | Lerner-index optimal discount per category with approval logging |
+| 3 | **At-Risk Customers** | RFM churn scoring, exportable cohort for Klaviyo/SendGrid |
+| 4 | **Model Drift** | PSI feature drift + R² prediction degradation monitoring |
+| 5 | **Revenue Trends** | Monthly revenue, AOV, discount trends, zone + brand breakdown |
+| 6 | **Categories** | Revenue mix, festival vs normal, metric selector |
+| 7 | **Regional** | Top 15 states, zone pie, units by zone |
+| 8 | **Inventory** | Velocity-based alert scatter dashboard + filterable table |
+| 9 | **CLV** | BG/NBD CLV tiers, distribution histogram, frequency scatter |
+| 10 | **Anomalies** | Isolation Forest + DBSCAN + Z-score (Supabase cached, 7-day TTL) |
+| 11 | **Cohort** | Retention rate + revenue retention heatmaps |
+| 12 | **Pareto** | 80/20 chart, sunburst, Lorenz curve + Gini coefficient |
+| 13 | **Operational Actions** | Approve price changes, export at-risk cohort, action log |
+| 14 | **🤖 Merchant Insights Copilot** | Ask natural-language questions, get cited AI answers |
+| 15 | **🔍 Exploratory Analysis** | Distributions, box plots, violin plots, pie charts, count plots |
+| 16 | **📈 Forecasting** | Seasonal decomposition, Prophet + SARIMA with horizon slider |
+| 17 | **🤖 ML Models** | Train & compare LR/DT/RF/XGBoost/MLP + permutation importance |
+
+---
+
+## 🤖 Merchant Insights Copilot
+
+Ask any business question in plain English. No tab-clicking required.
+
+```
+"Why did AOV drop in the South zone last month?"
+"Which customers are at risk of churning in Tier-1 cities?"
+"What discount should I offer on Electronics to maximise revenue?"
+"Are there anomalous orders or fraud signals this quarter?"
+"How does CLV compare across product categories?"
+```
+
+### How it works
+
+```
+Your question
+     │
+     ▼
+┌─────────────────────────────┐
+│  Keyword Planner            │  Maps question → 1-3 analytics tools
+│  (price, churn, anomaly…)   │
+└─────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────┐
+│  Tool Execution             │  Calls real module functions on your live data
+│  (9 analytics modules)      │
+└─────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────┐
+│  TF-IDF RAG Store           │  Chunks outputs, retrieves top-3 relevant chunks
+│  (sklearn, no vector DB)    │  via cosine similarity
+└─────────────────────────────┘
+     │
+     ▼
+┌─────────────────────────────┐
+│  LLM Synthesis              │  OpenAI gpt-4o-mini with inline [source] citations
+│  (demo mode if no API key)  │
+└─────────────────────────────┘
+     │
+     ▼
+  Cited answer with expandable Tool Outputs + Retrieved Context
+```
+
+> **Demo mode:** Works without `OPENAI_API_KEY` — returns raw module summaries instead of LLM synthesis.
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+- Python **3.11** (required — matches Streamlit Cloud environment)
+- Git
+
+### Local setup
+
+```powershell
+# 1. Clone
+git clone https://github.com/SumedhPatil1507/indian-ecommerce-analytics
+cd indian-ecommerce-analytics/ecommerce-analytics
+
+# 2. Create virtual environment (Python 3.11)
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # macOS/Linux
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment (optional)
+copy .env.example .env
+# Edit .env — add OPENAI_API_KEY and/or Supabase keys
+
+# 5. Run
+streamlit run dashboard/app.py
+```
+
+Opens at **http://localhost:8501** 🎉
+
+### Environment variables
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `OPENAI_API_KEY` | Optional | Enables AI-generated Copilot answers (demo mode without it) |
+| `SUPABASE_URL` | Optional | Enables result caching + operational logging |
+| `SUPABASE_ANON_KEY` | Optional | Supabase authentication |
+
+---
+
+## 📡 Live Data Sources
+
+| Source | Data | Refresh | License |
+|--------|------|---------|---------|
+| [World Bank Open Data](https://data.worldbank.org/) | India GDP growth + CPI inflation | Daily | CC BY 4.0 |
+| [fawazahmed0/exchange-api](https://github.com/fawazahmed0/exchange-api) | Live USD/INR rate (3-source waterfall) | Real-time | CC0 |
+| [Google Trends via pytrends](https://github.com/GeneralMills/pytrends) | E-commerce search interest India | Daily | Apache 2.0 |
+
+---
+
+## 🗄️ Supabase (Optional Persistence)
+
+When `SUPABASE_URL` + `SUPABASE_ANON_KEY` are configured:
 
 | Table | Purpose | TTL |
-|---|---|---|
-| `operational_actions` | Approved price changes, at-risk exports, drift alerts | Permanent |
+|-------|---------|-----|
+| `operational_actions` | Approved price changes, at-risk exports | Permanent |
 | `clv_cache` | CLV tier computation results | 24 hours |
 | `anomaly_cache` | Weekly anomaly scores | 7 days |
 | `model_results` | Heavy model outputs (Prophet, SARIMA) | 24 hours |
 
----
-
-## Quick Start
-
-```bash
-git clone https://github.com/SumedhPatil1507/indian-ecommerce-analytics
-cd ecommerce-analytics
-
-# Create a Python 3.11 virtual environment (required — see Python version note below)
-python3.11 -m venv .venv
-source .venv/bin/activate        # Windows: .venv\Scripts\activate
-
-pip install -r requirements.txt
-
-# Run dashboard (opens at http://localhost:8501)
-streamlit run dashboard/app.py
-```
-
-### Python Version
-
-**Python 3.11 is required.** A `runtime.txt` file pins Streamlit Cloud to Python 3.11 automatically.
-
-- `lifetimes` max published version is `0.11.3` — pinned to `==0.11.3` in `requirements.txt`.
-- `prophet` requires `pystan` which has no Python 3.14 wheels.
-- Run locally with Python 3.11 to match the Cloud environment exactly.
-
-### NumPy Compatibility
-
-Uses a version-agnostic trapezoid shim (`getattr(np, "trapezoid", None) or getattr(np, "trapz", None)`) that works on both NumPy 1.x (`np.trapz`) and NumPy 2.x (`np.trapezoid`), since each version removed the other's name.
-
-## Visual Theme
-
-The dashboard uses a dark indigo theme for improved contrast and readability:
-- **Background:** Deep navy (`#0F172A`) with slate card surfaces (`#1E293B`)
-- **Tab bar:** Inactive tabs in slate, active tab highlighted in indigo (`#6366F1`) with white text
-- **Charts:** All Plotly charts use a consistent dark template with slate backgrounds and light axis labels
-- **Metrics:** Card-style metric tiles with visible borders on the dark background
-
-## Supabase Setup (optional)
-1. Create project at [supabase.com](https://supabase.com) — name: `indiacommerce-analytics`, region: `ap-south-1`
-2. Run `supabase_schema.sql` in Supabase SQL Editor
-3. Create Storage bucket named `datasets` (set to private)
-4. Add to Streamlit Cloud **App Settings → Secrets**:
+**Setup:**
+1. Create project at [supabase.com](https://supabase.com) — region: `ap-south-1`
+2. Run `supabase_schema.sql` in the SQL Editor
+3. Add to **Streamlit Cloud → App Settings → Secrets**:
 
 ```toml
 SUPABASE_URL = "https://xxxx.supabase.co"
 SUPABASE_ANON_KEY = "eyJ..."
 SUPABASE_SERVICE_KEY = "eyJ..."
+OPENAI_API_KEY = "sk-..."
 ```
 
-## GitHub Update Commands (VS Code Terminal)
+---
 
-```powershell
-cd "C:\Users\Sumedh\projects\Indian-ecommerce-project\ecommerce-analytics"
-git add .
-git commit -m "your message"
-git push
-```
-
-Streamlit Cloud auto-redeploys within ~30 seconds of a push to `main`.
-
-## Project Structure
+## 🏗️ Project Structure
 
 ```
 ecommerce-analytics/
-├── data/
-│   ├── loader.py          # Multi-format loader + live macro enrichment
-│   └── connectors.py      # Shopify, Amazon, WooCommerce, Simulation Sandbox
-├── modules/
-│   ├── insights.py        # Executive summary + recommendations engine
-│   ├── price_optimizer.py # Lerner-index dynamic pricing
-│   ├── at_risk.py         # RFM churn risk scoring
-│   ├── model_drift.py     # PSI + prediction drift monitoring
-│   ├── clv.py             # BG/NBD + Gamma-Gamma CLV
-│   ├── anomaly.py         # Isolation Forest + DBSCAN + Z-score
-│   ├── cohort.py          # Cohort retention heatmaps
-│   ├── inventory_alerts.py# Velocity-based inventory alerts
-│   └── export.py          # PDF + Excel export
-│   ├── copilot.py         # Merchant Insights Copilot (keyword planning + TF-IDF RAG)
-│   ├── price_elasticity.py# Price elasticity analysis (log-log regression)
-│   ├── eda.py             # Exploratory Data Analysis (distributions, categorical, boxplots)
-│   ├── models.py          # ML model training + comparison (LR/DT/RF/XGBoost/MLP)
-│   ├── explainability.py  # SHAP + permutation importance + LIME
-│   └── time_series.py     # Time series trends + Prophet + SARIMA forecasting
-├── core/
-│   ├── config.py          # App + Supabase configuration
-│   └── database.py        # Supabase persistence + model result caching
-├── dashboard/
-│   └── app.py             # Streamlit dashboard (17 tabs, no login required)
-├── api/
-│   └── main.py            # FastAPI REST endpoints (optional)
-├── supabase_schema.sql    # Complete Supabase schema
-├── .streamlit/config.toml # Streamlit theme (dark text, indigo accent)
-├── .env.example           # Environment variable template
-└── requirements.txt       # Streamlit Cloud–compatible deps (Python 3.11, lifetimes==0.11.3)
-└── runtime.txt            # Pins Python 3.11 on Streamlit Cloud
-
+│
+├── 📊 dashboard/
+│   ├── app.py              # Main Streamlit app (18 tabs)
+│   ├── style.py            # Dark indigo theme CSS + Plotly dark template
+│   └── copilot_tab.py      # Merchant Insights Copilot UI
+│
+├── 🧠 modules/
+│   ├── insights.py         # Executive summary + recommendations
+│   ├── price_optimizer.py  # Lerner-index dynamic pricing
+│   ├── at_risk.py          # RFM churn risk scoring
+│   ├── model_drift.py      # PSI + prediction drift monitoring
+│   ├── clv.py              # BG/NBD + Gamma-Gamma CLV
+│   ├── anomaly.py          # Isolation Forest + DBSCAN + Z-score
+│   ├── cohort.py           # Cohort retention heatmaps
+│   ├── pareto.py           # Pareto, Lorenz, choropleth, sunburst
+│   ├── inventory_alerts.py # Velocity-based inventory alerts
+│   ├── eda.py              # Exploratory data analysis
+│   ├── time_series.py      # Prophet + SARIMA forecasting
+│   ├── models.py           # ML model training + comparison
+│   ├── explainability.py   # SHAP + permutation importance
+│   ├── price_elasticity.py # Log-log OLS elasticity engine
+│   ├── copilot.py          # Copilot: keyword planner + TF-IDF RAG + LLM
+│   └── export.py           # PDF + Excel export
+│
+├── 📡 data/
+│   ├── loader.py           # Multi-format loader + live macro enrichment
+│   └── connectors.py       # Shopify, Amazon, WooCommerce, Sandbox
+│
+├── ⚙️  core/
+│   ├── config.py           # App + Supabase configuration
+│   └── database.py         # Supabase persistence + result caching
+│
+├── 🐳 api/
+│   └── main.py             # FastAPI REST endpoints (optional)
+│
+├── runtime.txt             # Pins Python 3.11 on Streamlit Cloud
+├── requirements.txt        # All dependencies (Cloud-compatible)
+├── supabase_schema.sql     # Complete Supabase schema
+└── .env.example            # Environment variable template
 ```
 
-## Citations
+---
 
-- World Bank (2024). World Development Indicators - India. https://data.worldbank.org/country/india. License: CC BY 4.0
-- fawazahmed0 (2024). exchange-api. https://github.com/fawazahmed0/exchange-api. License: CC0
-- GeneralMills (2023). pytrends. https://github.com/GeneralMills/pytrends. License: Apache 2.0
+## 🎨 Visual Theme
+
+The dashboard uses a **dark indigo** design system:
+
+| Element | Colour | Hex |
+|---------|--------|-----|
+| Background | Deep navy | `#0F172A` |
+| Card surfaces | Slate | `#1E293B` |
+| Active tab | Indigo | `#6366F1` |
+| Primary button | Indigo | `#4F46E5` |
+| Body text | Light slate | `#F1F5F9` |
+| Muted text | Mid slate | `#94A3B8` |
+
+All 18 tabs use a consistent Plotly dark template (`paper_bgcolor=#1E293B`, `plot_bgcolor=#0F172A`) with slate grid lines and light axis labels.
+
+---
+
+## 🔧 Compatibility Notes
+
+| Issue | Fix |
+|-------|-----|
+| **NumPy 1.x vs 2.x** | `np.trapz` removed in 2.0; `np.trapezoid` added in 2.0. Uses `getattr(np, "trapezoid", None) or getattr(np, "trapz", None)` — works on both. |
+| **lifetimes package** | Max published version is `0.11.3`. Pinned to `==0.11.3` in `requirements.txt`. |
+| **Python version** | `runtime.txt` pins Python 3.11. Run locally with 3.11 to match Cloud exactly. |
+| **prophet on Cloud** | Pinned `prophet>=1.1,<2.0` — dashboard falls back gracefully if unavailable. |
+
+---
+
+## 📤 Update on GitHub (VS Code Terminal)
+
+Open the VS Code integrated terminal with **Ctrl + `** then run:
+
+```powershell
+# Navigate to project
+cd "C:\Users\Sumedh\projects\Indian-ecommerce-project\ecommerce-analytics"
+
+# See what changed
+git status
+
+# Stage all changes
+git add .
+
+# Commit with a message
+git commit -m "your descriptive message here"
+
+# Push to GitHub (triggers Streamlit Cloud auto-redeploy)
+git push
+```
+
+> **Tip:** Streamlit Cloud redeploys automatically within ~30 seconds of every push to `main`.
+
+### Stage specific files only
+
+```powershell
+# Stage individual files
+git add dashboard/app.py modules/copilot.py README.md
+
+# Or stage by folder
+git add modules/
+git add dashboard/
+
+# Check what's staged before committing
+git diff --staged --stat
+```
+
+### Useful git commands
+
+```powershell
+git log --oneline -10          # View last 10 commits
+git diff HEAD                  # See all uncommitted changes
+git restore <file>             # Discard changes to a file
+git stash                      # Temporarily shelve changes
+git pull                       # Pull latest from GitHub
+```
+
+---
+
+## 📖 Citations
+
+- World Bank (2024). *World Development Indicators — India*. https://data.worldbank.org/country/india. License: CC BY 4.0
+- fawazahmed0 (2024). *exchange-api*. https://github.com/fawazahmed0/exchange-api. License: CC0
+- GeneralMills (2023). *pytrends*. https://github.com/GeneralMills/pytrends. License: Apache 2.0
 - Kaggle dataset: https://www.kaggle.com/datasets/shukla922/indian-e-commerce-pricing-revenue-growth
 
-## Merchant Insights Copilot
+---
 
-The **Merchant Insights Copilot** is a conversational AI agent built into the dashboard that lets merchants ask natural-language questions and get synthesised, data-backed answers — without clicking through 14 tabs manually.
+<div align="center">
 
-### How it works
+Built with ❤️ using [Streamlit](https://streamlit.io) · [Plotly](https://plotly.com) · [scikit-learn](https://scikit-learn.org) · [OpenAI](https://openai.com)
 
-1. **Keyword Planning** — The copilot maps your question keywords to 1-3 relevant analytics modules (`price_optimizer`, `at_risk`, `clv`, `anomaly`, `insights`, `inventory_alerts`, `price_elasticity`, `cohort`, `time_series`) using a configurable keyword→tool table.
-2. **Tool Execution** — It calls the real analytics functions from each planned module against your live filtered data and generates structured text summaries.
-3. **TF-IDF RAG** — Each tool output is chunked and stored in an in-process vector store. Relevant chunks are retrieved via cosine similarity (no external vector DB required — uses `scikit-learn` TF-IDF).
-4. **LLM Synthesis** — Retrieved chunks and fresh tool outputs are fed to OpenAI `gpt-4o-mini` (falls back to `gpt-3.5-turbo`) with an instruction to cite sources inline like `[price_optimizer]`.
-
-### Setup
-
-Set `OPENAI_API_KEY` in your `.env` file or Streamlit secrets:
-
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-### Demo Mode
-
-If `OPENAI_API_KEY` is not set, the Copilot runs in **demo mode**: it still executes all planned analytics tools and displays the raw structured summaries, but skips LLM synthesis. A yellow banner in the UI indicates demo mode.
-
-### Example Questions
-
-- "Why did AOV drop in the South zone last month?"
-- "Which customers are at risk of churning in Tier-1 cities?"
-- "What discount should I offer on Electronics to maximise revenue?"
-- "Are there any anomalous orders or fraud signals this quarter?"
-- "How does customer lifetime value compare across product categories?"
-
-### New Analytics Tabs (v4.1)
-
-Three new tabs have been added to the dashboard:
-- **🔍 Exploratory Analysis** — Interactive distributions, categorical plots, box plots, violin plots, and pie charts for deep data exploration.
-- **📈 Forecasting** — Revenue trend plots, seasonal decomposition, and Prophet + SARIMA forecasting with configurable horizon.
-- **🤖 ML Models** — Train and compare Linear Regression, Decision Tree, Random Forest, XGBoost, and Neural Network models with permutation feature importance.
+</div>
