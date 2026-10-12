@@ -39,3 +39,7 @@ python-dotenv>=1.0
 
 # ── AI Copilot (optional — demo mode works without OPENAI_API_KEY) ─────────
 openai>=1.0.0
+guardrails-ai>=0.6,<1.0
+opentelemetry-api>=1.28
+opentelemetry-sdk>=1.28
+opentelemetry-exporter-otlp-proto-http>=1.28

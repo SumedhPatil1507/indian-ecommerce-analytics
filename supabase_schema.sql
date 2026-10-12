@@ -40,6 +40,20 @@ create table if not exists public.orders (
 create index if not exists idx_orders_tenant_date on public.orders(tenant_id, order_date desc);
 create index if not exists idx_orders_tenant_cat on public.orders(tenant_id, category);
 
+-- Kafka ingestion audit. event_id uniqueness makes replay after a partial
+-- downstream failure safe when Kafka redelivers an uncommitted message.
+create table if not exists public.order_ingest_audit (
+  event_id        text primary key,
+  order_id        text not null,
+  customer_id     text,
+  merchant_id     text,
+  event_timestamp timestamptz not null,
+  payload         jsonb not null,
+  ingested_at     timestamptz not null default now()
+);
+create index if not exists idx_order_ingest_audit_event_time
+  on public.order_ingest_audit(event_timestamp desc);
+
 create table if not exists public.datasets (
   id          bigserial primary key,
   tenant_id   uuid references auth.users(id) on delete cascade not null,

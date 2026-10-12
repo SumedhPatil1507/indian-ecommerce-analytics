@@ -10,11 +10,14 @@ Automated Anomaly Detection
 """
 import numpy as np
 import pandas as pd
+import logging
 import plotly.express as px
 import plotly.graph_objects as go
 from sklearn.ensemble import IsolationForest
 from sklearn.preprocessing import RobustScaler
 from sklearn.cluster import DBSCAN
+
+logger = logging.getLogger(__name__)
 
 
 #  feature prep 
@@ -93,10 +96,37 @@ def anomaly_report(df: pd.DataFrame) -> pd.DataFrame:
     df = detect_zscore(df)
     df = detect_dbscan(df)
 
+    # Optional trained graph model contributes RTO and promotional-fraud risk.
+    # A missing checkpoint or optional PyG install leaves existing analytics usable.
+    try:
+        from modules.rto_graph import predict_risk_scores
+        graph_scores = predict_risk_scores(df)
+    except Exception as exc:
+        logger.warning("R-GCN risk scoring unavailable: %s", exc)
+        graph_scores = None
+    if graph_scores is not None:
+        df["rto_probability"] = graph_scores["rto_probability"]
+        df["promo_fraud_risk"] = graph_scores["promo_fraud_risk"]
+        df["gnn_risk_score"] = df[["rto_probability", "promo_fraud_risk"]].max(axis=1)
+        df["gnn_risk_flag"] = df["gnn_risk_score"] >= 0.5
+    else:
+        df["rto_probability"] = np.nan
+        df["promo_fraud_risk"] = np.nan
+        df["gnn_risk_score"] = np.nan
+        df["gnn_risk_flag"] = False
+
     df["anomaly_votes"] = (
         df["is_anomaly"].astype(int) +
         df["zscore_anomaly"].astype(int) +
-        df["dbscan_anomaly"].astype(int)
+        df["dbscan_anomaly"].astype(int) +
+        df["gnn_risk_flag"].astype(int)
+    )
+    # Graph risk is the strongest single attribution, blended with the
+    # Isolation Forest decision when a trained GNN is available.
+    df["risk_attribution_score"] = np.where(
+        df["gnn_risk_score"].notna(),
+        0.6 * df["gnn_risk_score"].fillna(0) + 0.4 * df["is_anomaly"].astype(float),
+        df["is_anomaly"].astype(float),
     )
     df["confirmed_anomaly"] = df["anomaly_votes"] >= 2
     return df

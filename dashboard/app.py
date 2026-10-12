@@ -704,6 +704,25 @@ with tabs[10]:
     st.plotly_chart(_fig_anom_bar,
         use_container_width=True)
 
+    if anom["gnn_risk_score"].notna().any():
+        st.markdown("#### Graph model risk attribution")
+        score_cols = st.columns(3)
+        score_cols[0].metric("Average RTO probability", f"{anom['rto_probability'].mean():.1%}")
+        score_cols[1].metric("Average promo fraud risk", f"{anom['promo_fraud_risk'].mean():.1%}")
+        score_cols[2].metric("High graph-risk orders", f"{anom['gnn_risk_flag'].sum():,}")
+        risk_fig = px.scatter(
+            anom, x="rto_probability", y="promo_fraud_risk", color="gnn_risk_score",
+            color_continuous_scale="OrRd", size="revenue", size_max=16, opacity=0.75,
+            hover_data=["category", "zone", "risk_attribution_score"],
+            labels={"rto_probability": "RTO probability", "promo_fraud_risk": "Promotion fraud risk",
+                    "gnn_risk_score": "Graph risk", "revenue": "Revenue"},
+            title="RTO vs promotional fraud risk", template="plotly_white",
+        )
+        risk_fig = apply_dark_theme(risk_fig)
+        st.plotly_chart(risk_fig, use_container_width=True, config={"displaylogo": False, "scrollZoom": True})
+    else:
+        st.caption("Graph risk scores appear when a trained checkpoint is configured with RTO_GNN_CHECKPOINT.")
+
 #  TAB 10: Cohort 
 with tabs[11]:
     st.subheader("Cohort Analysis")

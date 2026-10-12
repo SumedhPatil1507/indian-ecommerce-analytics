@@ -90,6 +90,9 @@ def render_copilot_tab(df: pd.DataFrame, filters: dict | None = None) -> None:
                 "sources":      result["sources"],
                 "tool_outputs": result["tool_outputs"],
                 "chunks_used":  result["chunks_used"],
+                "chunk_ids":    result.get("chunk_ids", []),
+                "state": result.get("state", "answered"),
+                "fallback_reason": result.get("fallback_reason"),
             })
         except Exception as e:
             st.error(f" Something went wrong: {e}. Please check the logs or try a different question.")
@@ -99,6 +102,10 @@ def render_copilot_tab(df: pd.DataFrame, filters: dict | None = None) -> None:
     if history:
         st.markdown("### Conversation")
         for i, turn in enumerate(reversed(history)):
+            if turn.get("state") == "fallback":
+                st.warning(turn.get("fallback_reason") or "The answer could not be verified, so the Copilot used its safe fallback.")
+            elif turn.get("state") == "demo":
+                st.info("Demo answer: add OPENAI_API_KEY to enable model generated responses.")
             # User bubble
             st.markdown(
                 f"<div style='background:#f1f5f9;border-radius:8px;padding:10px 14px;"
@@ -130,7 +137,9 @@ def render_copilot_tab(df: pd.DataFrame, filters: dict | None = None) -> None:
             if turn["chunks_used"]:
                 with st.expander(f" Retrieved Context ({len(turn['chunks_used'])} chunks)", expanded=False):
                     for j, chunk in enumerate(turn["chunks_used"], 1):
-                        st.markdown(f"**Chunk {j}:**")
+                        citation = turn.get("chunk_ids", [])
+                        citation_label = citation[j - 1] if j <= len(citation) else f"{j}"
+                        st.markdown(f"**Citation `chunk:{citation_label}`**")
                         st.text(chunk[:500] + ("..." if len(chunk) > 500 else ""))
                         st.markdown("")
 

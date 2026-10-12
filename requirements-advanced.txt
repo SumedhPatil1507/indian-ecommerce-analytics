@@ -1,0 +1,15 @@
+# Optional streaming, feature store, graph, and evaluation services.
+-r requirements.txt
+
+feast[redis]>=0.40,<1.0
+aiokafka>=0.10
+asyncpg>=0.29
+redis>=5.0
+
+# Install a PyTorch wheel that matches your CPU/CUDA platform when needed.
+torch>=2.1
+torch-geometric>=2.5
+neo4j>=5.18
+
+# RAGAS is only needed to run the evaluation pipeline.
+ragas>=0.4,<0.5

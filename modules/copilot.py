@@ -6,7 +6,10 @@ Fully importable  no Streamlit dependency.
 from __future__ import annotations
 import logging
 import os
-import textwrap
+import hashlib
+import re
+from functools import wraps
+from contextlib import nullcontext
 from typing import Any
 
 import numpy as np
@@ -15,6 +18,117 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 logger = logging.getLogger(__name__)
+
+try:
+    from opentelemetry import trace
+    from opentelemetry.trace import ProxyTracerProvider
+    if isinstance(trace.get_tracer_provider(), ProxyTracerProvider):
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        provider = TracerProvider(resource=Resource.create({"service.name": "indiocommerce-copilot"}))
+        if os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+            from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+            provider.add_span_processor(BatchSpanProcessor(OTLPSpanExporter()))
+        trace.set_tracer_provider(provider)
+    _TRACER = trace.get_tracer("indiocommerce.copilot")
+except ImportError:  # retain importability in minimal installs
+    trace = None
+    _TRACER = None
+
+
+def _span(name: str, **attributes):
+    """Create a Copilot span without putting merchant text or PII in telemetry."""
+    if _TRACER is None:
+        return nullcontext(None)
+    manager = _TRACER.start_as_current_span(name)
+    return _SpanAttributes(manager, attributes)
+
+
+def _traced_answer(fn):
+    @wraps(fn)
+    def wrapped(self, question, df, filters=None):
+        with _span("copilot.answer", **{"copilot.question_length": len(question),
+                                         "copilot.input_rows": len(df)}) as span:
+            result = fn(self, question, df, filters)
+            if span:
+                span.set_attribute("copilot.response_state", result.get("state", "unknown"))
+            return result
+    return wrapped
+
+
+class _SpanAttributes:
+    def __init__(self, manager, attributes):
+        self.manager, self.attributes = manager, attributes
+
+    def __enter__(self):
+        span = self.manager.__enter__()
+        for key, value in self.attributes.items():
+            if value is not None:
+                span.set_attribute(key, value)
+        return span
+
+    def __exit__(self, *exc):
+        return self.manager.__exit__(*exc)
+
+
+def _validation_failure(answer: str, metadata: dict) -> str | None:
+    """Local deterministic fallback for deployments missing Guardrails AI."""
+    context_ids = set(metadata.get("chunk_ids", []))
+    cited_ids = set(re.findall(r"\[chunk:([A-Za-z0-9_-]+)\]", answer))
+    if not context_ids or not cited_ids.intersection(context_ids):
+        return "Answer omitted a valid retrieved chunk ID citation."
+    # Discount recommendations must agree with a measured optimizer output.
+    recommendations = re.finditer(
+        r"(?is)(?P<lead>(?:recommend(?:ation)?|suggest(?:ion)?|should|offer|set|reduce|increase|adjust)"
+        r"[^.!?\n]{0,100}?)(?P<pct>\d+(?:\.\d+)?)\s*(?:%|percent)", answer,
+    )
+    if recommendations:
+        verified_by_category = metadata.get("verified_by_category", {})
+        verified = set(metadata.get("verified_optimal_discounts", []))
+        for recommendation in recommendations:
+            proposed = float(recommendation.group("pct"))
+            lead = recommendation.group("lead").lower()
+            category_matches = [category for category in verified_by_category if category.lower() in lead]
+            allowed = verified
+            if category_matches:
+                allowed = {verified_by_category[category_matches[0]]}
+            if not allowed or not any(abs(proposed - value) <= 0.05 for value in allowed):
+                if proposed > 25:
+                    return f"Ungrounded discount suggestion exceeds the 25% cap ({proposed:g}%)."
+                return "Price adjustment is not verified by the Lerner-index optimizer."
+    return None
+
+
+def _guardrails_validate(answer: str, metadata: dict) -> tuple[bool, str | None]:
+    """Validate output through Guardrails AI custom validators plus local checks."""
+    failure = _validation_failure(answer, metadata)
+    try:
+        from guardrails import Guard
+        from guardrails.validator_base import FailResult, PassResult, Validator
+
+        class CopilotPolicyValidator(Validator):
+            def __init__(self, policy):
+                super().__init__(on_fail="exception")
+                self.policy = policy
+
+            def validate(self, value, validator_metadata):
+                message = _validation_failure(value, validator_metadata)
+                if message:
+                    return FailResult(error_message=message)
+                return PassResult()
+
+        guard = Guard().use(CopilotPolicyValidator("citation-and-pricing"))
+        result = guard.validate(answer, metadata=metadata)
+        if not getattr(result, "validation_passed", True):
+            return False, failure or "Guardrails AI rejected the response."
+    except ImportError:
+        logger.warning("guardrails-ai is missing; deterministic Copilot checks are active")
+    except Exception as exc:
+        return False, failure or f"Guardrails AI validation failed: {exc}"
+    if failure:
+        return False, failure
+    return True, None
 
 # ---------------------------------------------------------------------------
 # Keyword  tool mapping
@@ -48,22 +162,29 @@ class MerchantCopilot:
         """Chunk text by paragraphs and store in RAG memory."""
         paragraphs = [p.strip() for p in text.split("\n\n") if len(p.strip()) > 40]
         for para in paragraphs:
-            self._chunks.append({"chunk": para, "source": source, "metadata": metadata or {}})
+            chunk_id = hashlib.sha256(f"{source}\0{para}".encode("utf-8")).hexdigest()[:16]
+            self._chunks.append({"chunk_id": chunk_id, "chunk": para, "source": source, "metadata": metadata or {}})
         self._vectorizer = None  # invalidate cache
         self._matrix = None
 
     def _retrieve(self, query: str, top_k: int = 3) -> list[dict]:
         """Return top_k most relevant chunks for query using TF-IDF cosine similarity."""
-        if not self._chunks:
-            return []
-        if self._vectorizer is None or self._matrix is None:
-            texts = [c["chunk"] for c in self._chunks]
-            self._vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
-            self._matrix = self._vectorizer.fit_transform(texts)
-        q_vec = self._vectorizer.transform([query])
-        scores = cosine_similarity(q_vec, self._matrix).flatten()
-        top_idx = np.argsort(scores)[::-1][:top_k]
-        return [self._chunks[i] for i in top_idx if scores[i] > 0]
+        with _span("copilot.retrieval.search", **{"retrieval.backend": "tfidf", "retrieval.top_k": top_k,
+                   "retrieval.chunk_count": len(self._chunks)}):
+            if not self._chunks:
+                return []
+            if self._vectorizer is None or self._matrix is None:
+                texts = [c["chunk"] for c in self._chunks]
+                self._vectorizer = TfidfVectorizer(stop_words="english", max_features=5000)
+                self._matrix = self._vectorizer.fit_transform(texts)
+            q_vec = self._vectorizer.transform([query])
+            scores = cosine_similarity(q_vec, self._matrix).flatten()
+            top_idx = np.argsort(scores)[::-1][:top_k]
+            matches = [self._chunks[i] for i in top_idx if scores[i] > 0]
+            if _TRACER:
+                from opentelemetry import trace as otel_trace
+                otel_trace.get_current_span().set_attribute("retrieval.result_count", len(matches))
+            return matches
 
     # ------------------------------------------------------------------
     # Tool: Price Optimizer
@@ -205,6 +326,19 @@ class MerchantCopilot:
             lines.append(f"  Isolation Forest flags: {iso_ct:,}")
             lines.append(f"  Z-score flags: {z_ct:,}")
             lines.append(f"  DBSCAN flags: {db_ct:,}")
+            if result["gnn_risk_score"].notna().any():
+                high_risk = result["gnn_risk_score"] >= 0.5
+                lines.append(f"  R-GCN high-risk orders: {int(high_risk.sum()):,}")
+                lines.append(
+                    f"  Mean RTO probability: {result['rto_probability'].mean():.1%}; "
+                    f"mean promotional fraud risk: {result['promo_fraud_risk'].mean():.1%}"
+                )
+                if "buyer_id" in result:
+                    buyers = (result.groupby("buyer_id", dropna=False)[["rto_probability", "promo_fraud_risk"]]
+                              .max().max(axis=1).sort_values(ascending=False).head(5))
+                    lines.append("\nHighest Graph Risk Buyers:")
+                    for buyer, score in buyers.items():
+                        lines.append(f"  {buyer}: {score:.1%}")
             cat_anom = (
                 result[result["confirmed_anomaly"]]
                 .groupby("category")
@@ -465,6 +599,7 @@ class MerchantCopilot:
     # Main answer method
     # ------------------------------------------------------------------
 
+    @_traced_answer
     def answer(
         self,
         question: str,
@@ -483,7 +618,11 @@ class MerchantCopilot:
             chunks_used  : list[str]  RAG chunks fed to LLM
         """
         # 1. Plan
-        planned_tools = self._plan_tools(question)
+        with _span("copilot.intent.plan") as span:
+            planned_tools = self._plan_tools(question)
+            if span:
+                span.set_attribute("copilot.planned_tool_count", len(planned_tools))
+                span.set_attribute("copilot.planned_tools", planned_tools)
         logger.info("Copilot planned tools: %s", planned_tools)
 
         # 2. Execute tools
@@ -502,11 +641,13 @@ class MerchantCopilot:
         for tool_name in planned_tools:
             fn = tool_fn_map.get(tool_name)
             if fn:
-                tool_outputs[tool_name] = fn(df, filters or {})
+                with _span("copilot.analytics.tool", **{"copilot.tool_name": tool_name}):
+                    tool_outputs[tool_name] = fn(df, filters or {})
 
         # 3. Retrieve relevant chunks from RAG
         chunks = self._retrieve(question, top_k=3)
         chunks_text = [c["chunk"] for c in chunks]
+        chunk_ids = [c["chunk_id"] for c in chunks]
         sources = list(tool_outputs.keys())
 
         # 4. Synthesise answer
@@ -517,12 +658,15 @@ class MerchantCopilot:
             demo_answer = (
                 "**[DEMO MODE - Set OPENAI_API_KEY for AI-generated answers]**\n\n"
                 + raw
+                + ("\n\nEvidence: " + " ".join(f"[chunk:{chunk_id}]" for chunk_id in chunk_ids) if chunk_ids else "")
             )
             return {
                 "answer":       demo_answer,
                 "sources":      sources,
                 "tool_outputs": tool_outputs,
                 "chunks_used":  chunks_text,
+                "chunk_ids":    chunk_ids,
+                "state":        "demo",
             }
 
         try:
@@ -530,7 +674,7 @@ class MerchantCopilot:
             client = openai.OpenAI(api_key=api_key)
 
             context_block = "\n\n".join(
-                f"[{c['source']}]\n{c['chunk']}" for c in chunks
+                f"[chunk:{c['chunk_id']}] [{c['source']}]\n{c['chunk']}" for c in chunks
             )
             tools_block = "\n\n".join(
                 f"[{name}]\n{out}" for name, out in tool_outputs.items()
@@ -539,7 +683,12 @@ class MerchantCopilot:
             system_prompt = (
                 "You are a merchant analytics assistant for an Indian e-commerce platform. "
                 "Answer merchant questions precisely and concisely, citing data sources inline "
-                "using [source_name] notation (e.g. [price_optimizer], [at_risk], [clv]). "
+                "using [source_name] notation and cite at least one retrieved vector chunk exactly "
+                "as [chunk:CHUNK_ID]. Never invent chunk IDs. "
+                "Use verified price_optimizer results for every discount recommendation. "
+                "Do not recommend adjustments that violate the Lerner-index result. "
+                "Never suggest a discount above 25% unless that exact value is explicitly grounded "
+                "in the price_optimizer output. "
                 "Use Indian currency (Rs) and Indian business context. "
                 "Focus on actionable insights. Keep the answer under 300 words."
             )
@@ -551,10 +700,11 @@ Fresh analytics data from our tools:
 Additional context from analytics history:
 {context_block}
 
-Answer the question with specific numbers and cite sources inline like [price_optimizer]."""
+Answer the question with specific numbers, cite sources inline, and cite retrieved chunks as [chunk:CHUNK_ID]."""
 
             try:
-                response = client.chat.completions.create(
+                with _span("copilot.llm.generate", **{"llm.provider": "openai", "llm.model": "gpt-4o-mini"}):
+                    response = client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -562,9 +712,10 @@ Answer the question with specific numbers and cite sources inline like [price_op
                     ],
                     temperature=0.3,
                     max_tokens=600,
-                )
+                    )
             except openai.NotFoundError:
-                response = client.chat.completions.create(
+                with _span("copilot.llm.generate", **{"llm.provider": "openai", "llm.model": "gpt-3.5-turbo"}):
+                    response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
                         {"role": "system", "content": system_prompt},
@@ -572,23 +723,62 @@ Answer the question with specific numbers and cite sources inline like [price_op
                     ],
                     temperature=0.3,
                     max_tokens=600,
-                )
+                    )
 
             answer_text = response.choices[0].message.content
+            verified = []
+            verified_by_category = {}
+            if "price_optimizer" in tool_outputs:
+                for line in tool_outputs["price_optimizer"].splitlines():
+                    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+                    if len(cells) >= 3:
+                        match = re.fullmatch(r"(\d+(?:\.\d+)?)%?", cells[2])
+                        if match and cells[0].lower() not in {"category", "---"}:
+                            optimal = float(match.group(1))
+                            verified.append(optimal)
+                            verified_by_category[cells[0]] = optimal
+            guard_metadata = {"chunk_ids": chunk_ids, "verified_optimal_discounts": verified,
+                              "verified_by_category": verified_by_category}
+            with _span("copilot.output.validate", **{"guardrails.enabled": True}) as span:
+                valid, failure_reason = _guardrails_validate(answer_text or "", guard_metadata)
+                if span:
+                    span.set_attribute("guardrails.passed", valid)
+                    if failure_reason:
+                        span.set_attribute("guardrails.failure_reason", failure_reason)
+            if not valid:
+                logger.warning("Copilot output rejected by guardrails: %s", failure_reason)
+                raw = "\n\n".join(tool_outputs.values())
+                fallback_answer = (f"**[SAFE FALLBACK: generated answer failed validation]**\n\n{raw}"
+                                   + ("\n\nEvidence: " + " ".join(f"[chunk:{chunk_id}]" for chunk_id in chunk_ids)
+                                      if chunk_ids else "\n\nNo retrieved evidence was available."))
+                return {
+                    "answer": fallback_answer,
+                    "sources": sources, "tool_outputs": tool_outputs,
+                    "chunks_used": chunks_text, "chunk_ids": chunk_ids,
+                    "state": "fallback", "fallback_reason": failure_reason,
+                }
             return {
                 "answer":       answer_text,
                 "sources":      sources,
                 "tool_outputs": tool_outputs,
                 "chunks_used":  chunks_text,
+                "chunk_ids":    chunk_ids,
+                "state":        "answered",
             }
 
         except Exception as e:
             logger.error("LLM call failed: %s", e)
             # Fall back to demo mode on LLM error
             raw = "\n\n".join(tool_outputs.values())
+            fallback_answer = f"**[LLM error]**\n\n{raw}"
+            if chunk_ids:
+                fallback_answer += "\n\nEvidence: " + " ".join(f"[chunk:{chunk_id}]" for chunk_id in chunk_ids)
             return {
-                "answer":       f"**[LLM error: {e}]**\n\n{raw}",
+                "answer":       fallback_answer,
                 "sources":      sources,
                 "tool_outputs": tool_outputs,
                 "chunks_used":  chunks_text,
+                "chunk_ids":    chunk_ids,
+                "state":        "fallback",
+                "fallback_reason": str(e),
             }
