@@ -48,17 +48,18 @@ def optimal_discount(
     elasticity: float,
     current_discount: float,
     margin_target: float = 0.25,
-    max_discount: float = 60.0,
+    max_discount: float = 25.0,
 ) -> dict:
     """
     Compute the revenue-maximising discount given price elasticity.
     Uses the Lerner index: optimal markup = 1 / |elasticity|
     """
     if elasticity >= 0:
+        capped_discount = float(np.clip(current_discount, 0, max_discount))
         return {
-            "optimal_discount": current_discount,
-            "direction": "hold",
-            "rationale": "Giffen/luxury good  discounting may reduce demand",
+            "optimal_discount": capped_discount,
+            "direction": "decrease" if capped_discount < current_discount else "hold",
+            "rationale": "Giffen/luxury good; discounting may reduce demand, subject to the hard discount cap",
             "revenue_impact_pct": 0.0,
         }
     abs_e = abs(elasticity)

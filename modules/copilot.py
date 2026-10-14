@@ -88,14 +88,14 @@ def _validation_failure(answer: str, metadata: dict) -> str | None:
         verified = set(metadata.get("verified_optimal_discounts", []))
         for recommendation in recommendations:
             proposed = float(recommendation.group("pct"))
+            if proposed > 25:
+                return f"Discount recommendation exceeds the hard 25% cap ({proposed:g}%)."
             lead = recommendation.group("lead").lower()
             category_matches = [category for category in verified_by_category if category.lower() in lead]
             allowed = verified
             if category_matches:
                 allowed = {verified_by_category[category_matches[0]]}
             if not allowed or not any(abs(proposed - value) <= 0.05 for value in allowed):
-                if proposed > 25:
-                    return f"Ungrounded discount suggestion exceeds the 25% cap ({proposed:g}%)."
                 return "Price adjustment is not verified by the Lerner-index optimizer."
     return None
 
@@ -641,7 +641,8 @@ class MerchantCopilot:
         for tool_name in planned_tools:
             fn = tool_fn_map.get(tool_name)
             if fn:
-                with _span("copilot.analytics.tool", **{"copilot.tool_name": tool_name}):
+                span_name = "copilot.gnn.inference" if tool_name == "anomaly" else "copilot.analytics.tool"
+                with _span(span_name, **{"copilot.tool_name": tool_name}):
                     tool_outputs[tool_name] = fn(df, filters or {})
 
         # 3. Retrieve relevant chunks from RAG
@@ -687,8 +688,10 @@ class MerchantCopilot:
                 "as [chunk:CHUNK_ID]. Never invent chunk IDs. "
                 "Use verified price_optimizer results for every discount recommendation. "
                 "Do not recommend adjustments that violate the Lerner-index result. "
-                "Never suggest a discount above 25% unless that exact value is explicitly grounded "
-                "in the price_optimizer output. "
+                "Never suggest a discount above the hard 25% cap, even if an optimizer proposes it. "
+                "If the user message includes an Approved compliance policy context, treat its exact rules "
+                "as binding; do not invent thresholds or broaden their applicability. If it does not cover "
+                "the requested institution or transaction type, say the configured policy does not cover it. "
                 "Use Indian currency (Rs) and Indian business context. "
                 "Focus on actionable insights. Keep the answer under 300 words."
             )

@@ -30,6 +30,7 @@ if _ROOT not in sys.path:
 
 import core.config as cfg
 import core.database as db
+from core.fraud_response import FraudAssessment, build_fraud_assessment
 from data.loader import load_any
 from data.connectors import from_shopify_webhook, from_amazon_orders, from_woocommerce
 from worker.tasks import (
@@ -434,6 +435,45 @@ async def trigger_anomaly_recalculation(tenant: dict = Depends(get_current_tenan
     """Queues a new Celery anomaly detection task."""
     task = recalculate_anomaly_task.delay(tenant["tenant_id"])
     return {"status": "queued", "task_id": task.id}
+
+
+@app.get("/fraud/assessment", response_model=FraudAssessment, tags=["Fraud"])
+async def get_fraud_assessment(
+    customer_id: str = Query(..., min_length=1),
+    tenant: dict = Depends(get_current_tenant),
+):
+    """Return the canonical explainable fraud JSON for a tenant customer."""
+    orders = db.load_orders(tenant["tenant_id"], token=tenant["token"])
+    if orders.empty:
+        return build_fraud_assessment()
+    customer_column = "customer_id" if "customer_id" in orders else "buyer_id" if "buyer_id" in orders else None
+    if customer_column is None:
+        return build_fraud_assessment()
+    customer_orders = orders[orders[customer_column].astype(str) == str(customer_id)]
+    if customer_orders.empty:
+        return build_fraud_assessment()
+    cached = db.load_anomaly_cache(tenant["tenant_id"], orders, token=tenant["token"])
+    if cached is None or cached.empty:
+        return build_fraud_assessment()
+    cache_id = "customer_id" if "customer_id" in cached else "buyer_id" if "buyer_id" in cached else None
+    if cache_id is not None:
+        customer_cache = cached[cached[cache_id].astype(str) == str(customer_id)]
+    elif len(cached) == len(orders):
+        customer_cache = cached.loc[customer_orders.index.intersection(cached.index)]
+    else:
+        customer_cache = cached.iloc[0:0]
+    if customer_cache.empty:
+        return build_fraud_assessment()
+    row = customer_cache.iloc[-1]
+    contributions = row.get("xgboost_shap_contributions")
+    if not isinstance(contributions, dict):
+        contributions = None
+    return build_fraud_assessment(
+        collusion_probability=row.get("collusion_probability"),
+        rto_probability=row.get("rto_probability"),
+        graph_centrality_score=row.get("graph_centrality_score"),
+        shap_contributions=contributions,
+    )
 
 
 # --- Operational Actions Endpoints ---

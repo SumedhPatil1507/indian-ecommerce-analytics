@@ -1,0 +1,4 @@
+# Install in the Flink Python runtime. The matching Kafka connector JAR is a
+# separate JVM dependency; see the streaming section in README.md.
+apache-flink>=1.19,<2.0
+redis>=5.0
