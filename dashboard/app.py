@@ -786,9 +786,9 @@ with tabs[12]:
 # TAB 13: Operational Actions
 with tabs[13]:
     st.subheader("Operational Actions")
-    st.caption("Approve or dismiss model recommendations. Actions logged to Supabase for audit trail.")
+    st.caption("Review price recommendations and export at-risk customer cohorts.")
     if not cfg.SUPABASE_READY:
-        st.warning("Supabase not configured. Add SUPABASE_URL + SUPABASE_ANON_KEY to secrets for persistence.")
+        st.warning("Supabase is not configured. Approvals and exports cannot be saved to an audit log in this session.")
     act1, act2 = st.columns(2)
     with act1:
         st.markdown('<p class="section-title">Approve Price Optimisation</p>', unsafe_allow_html=True)
@@ -800,7 +800,7 @@ with tabs[13]:
             if st.button("Approve All Price Adjustments", type="primary", use_container_width=True, key="approve_price"):
                 payload = _price_recs[["category","current_discount","optimal_discount","direction","revenue_impact_pct"]].to_dict(orient="records")
                 ok = log_action("price_approval", {"recommendations": payload, "count": len(payload)}, status="approved")
-                st.success(f"Approved {len(payload)} adjustments." + (" Logged to Supabase." if ok else " (Supabase not configured)"))
+                st.success(f"Approved {len(payload)} adjustments." + (" Saved to the Supabase audit log." if ok else " This approval was not saved because Supabase is unavailable."))
             if st.button("Dismiss", use_container_width=True, key="dismiss_price"):
                 log_action("price_approval", {"count": len(_price_recs)}, status="dismissed")
                 st.info("Dismissed.")
@@ -830,7 +830,7 @@ with tabs[13]:
         if st.button("Update Status"):
             update_action_status(int(_aid), _ns); st.rerun()
     else:
-        st.info("No pending actions. Configure Supabase or approve/dismiss recommendations above.")
+        st.info("No pending actions are available." if cfg.SUPABASE_READY else "No pending actions can be shown because Supabase is not configured. Configure Supabase to enable the persistent action log.")
 
 # TAB 14: Merchant Insights Copilot
 with tabs[14]:

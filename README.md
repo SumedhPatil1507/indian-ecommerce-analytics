@@ -145,6 +145,22 @@ Set `COPILOT_COMPLIANCE_POLICY_JSON` to compliance-approved FinCEN and/or RBI ju
 
 The interactive chart demo is published from `docs/` by `.github/workflows/pages.yml` when changes reach `main`. If GitHub Pages has not previously been enabled for the repository, select **Settings → Pages → GitHub Actions** once; subsequent deployments run automatically.
 
+### Publish updates from VS Code
+
+Open this repository folder in VS Code, then choose **Terminal → New Terminal**. Run these commands from the `ecommerce-analytics` folder:
+
+```powershell
+git status
+git add -A
+git status
+git commit -m "Update analytics dashboard and interactive preview"
+git push origin main
+```
+
+Review the second `git status` output before committing to make sure it lists only files you intend to publish. The push updates the GitHub repository and triggers the Pages workflow when the dashboard preview, its workflow, or related files change. Check **Actions** on GitHub for the deployment result. The first time, enable **Settings → Pages → Build and deployment → GitHub Actions**.
+
+To start the dashboard from the same VS Code terminal after installing dependencies, run `streamlit run dashboard/app.py`. Plotly charts support hover details, zoom, pan, legend toggles, and toolbar downloads in the app.
+
 ## Repository map
 
 ```text

@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <title>IndiaCommerce Analytics | Interactive Preview</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <style>
+    :root { color-scheme: dark; --bg:#090e1b; --panel:#111a2d; --line:#26334d; --muted:#9aa9c4; --text:#edf3ff; --mint:#62e6bd; --blue:#7da8ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:radial-gradient(ellipse at 12% 0%,#172748 0,transparent 42%),var(--bg); color:var(--text); font:15px/1.5 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+    main { max-width:1200px; margin:auto; padding:48px 24px 64px; }
+    .eyebrow { color:var(--mint); font-size:12px; font-weight:750; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:10px 0 8px; font-size:clamp(32px,5vw,54px); letter-spacing:-.045em; line-height:1.05; }
+    .intro { max-width:720px; margin:0; color:var(--muted); font-size:16px; }
+    .toolbar { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin:28px 0 20px; }
+    select { border:1px solid var(--line); border-radius:10px; background:#111a2d; color:var(--text); padding:10px 14px; font:inherit; }
+    .hint { color:var(--muted); font-size:13px; }
+    .kpis { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:14px; margin:18px 0; }
+    .card,.chart-card { border:1px solid var(--line); border-radius:16px; background:linear-gradient(145deg,rgba(22,34,57,.96),rgba(14,22,39,.96)); box-shadow:0 14px 36px #0003; }
+    .card { padding:18px 20px; }
+    .label { color:var(--muted); font-size:12px; letter-spacing:.08em; text-transform:uppercase; }
+    .value { margin-top:4px; font-size:26px; font-weight:750; letter-spacing:-.03em; }
+    .charts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+    .chart-card { min-width:0; padding:16px 12px 8px; }
+    .chart-card.wide { grid-column:1/-1; }
+    .chart-title { margin:0 10px; font-size:16px; font-weight:650; }
+    .chart-subtitle { margin:3px 10px 0; color:var(--muted); font-size:12px; }
+    .plot { height:350px; }
+    .wide .plot { height:390px; }
+    .note { margin-top:18px; color:var(--muted); font-size:12px; }
+    a { color:var(--mint); }
+    @media(max-width:760px) { main { padding:34px 16px; } .kpis { grid-template-columns:repeat(2,minmax(0,1fr)); } .charts { grid-template-columns:1fr; } .chart-card.wide { grid-column:auto; } .plot,.wide .plot { height:320px; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">IndiaCommerce Analytics · chart playground</div>
+  <h1>Commerce signals,<br>made explorable.</h1>
+  <p class="intro">A small interactive preview of the Plotly charts in the Streamlit dashboard. Filter the sample category, hover for detail, zoom into time ranges, and use the chart toolbar to pan or reset.</p>
+  <div class="toolbar">
+    <label for="category">Focus category</label>
+    <select id="category" aria-label="Focus category"><option>All categories</option><option>Electronics</option><option>Fashion</option><option>Home</option><option>Beauty</option></select>
+    <span class="hint">All values below are illustrative sample data, not live business results.</span>
+  </div>
+  <section class="kpis" aria-label="Sample metrics">
+    <div class="card"><div class="label">Sample revenue</div><div class="value" id="revenue">—</div></div>
+    <div class="card"><div class="label">Sample orders</div><div class="value" id="orders">—</div></div>
+    <div class="card"><div class="label">Average order value</div><div class="value" id="aov">—</div></div>
+    <div class="card"><div class="label">Average discount</div><div class="value" id="discount">—</div></div>
+  </section>
+  <section class="charts">
+    <article class="chart-card wide"><h2 class="chart-title">Revenue and order pulse</h2><p class="chart-subtitle">Monthly sample trend · drag to zoom · range slider below the chart</p><div class="plot" id="trend"></div></article>
+    <article class="chart-card"><h2 class="chart-title">Revenue by region</h2><p class="chart-subtitle">Hover to inspect each regional total</p><div class="plot" id="regions"></div></article>
+    <article class="chart-card"><h2 class="chart-title">Discount and order value</h2><p class="chart-subtitle">Each point is a sample order · category selector filters the view</p><div class="plot" id="scatter"></div></article>
+  </section>
+  <p class="note">Interactive controls require JavaScript and a connection to the Plotly CDN. <a href="https://github.com/SumedhPatil1507/indian-ecommerce-analytics">Explore the source and run the full dashboard</a>.</p>
+</main>
+<script>
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const categories=['Electronics','Fashion','Home','Beauty'];
+  const regions=['North','South','East','West','Central'];
+  const colors={Electronics:'#7da8ff',Fashion:'#62e6bd',Home:'#ffc979',Beauty:'#d49bff'};
+  const rows=[];
+  for(let i=0;i<240;i++){
+    const category=categories[i%4], month=i%12, region=regions[(i*7+Math.floor(i/4))%5];
+    const base={Electronics:6800,Fashion:2400,Home:3900,Beauty:1700}[category];
+    const revenue=Math.round(base*(.58+((i*37)%91)/100)*(1+month*.035));
+    rows.push({category,month,region,revenue,discount:Math.round(3+((i*13)%36)),orders:1+(i%3)});
+  }
+  const fmt=n=>'₹'+Math.round(n).toLocaleString('en-IN');
+  const baseLayout={paper_bgcolor:'rgba(0,0,0,0)',plot_bgcolor:'rgba(0,0,0,0)',font:{color:'#dce7fb',family:'Inter,system-ui,sans-serif'},margin:{l:55,r:26,t:18,b:48},legend:{orientation:'h',y:-.25},hoverlabel:{bgcolor:'#17243c',font:{color:'#fff'}},xaxis:{gridcolor:'#26334d',zerolinecolor:'#26334d'},yaxis:{gridcolor:'#26334d',zerolinecolor:'#26334d'},autosize:true};
+  const config={responsive:true,displaylogo:false,scrollZoom:true,modeBarButtonsToRemove:['lasso2d','select2d']};
+  function draw(){
+    const chosen=document.getElementById('category').value;
+    const view=chosen==='All categories'?rows:rows.filter(r=>r.category===chosen);
+    const monthly=months.map((_,m)=>view.filter(r=>r.month===m));
+    const rev=monthly.map(group=>group.reduce((s,r)=>s+r.revenue,0));
+    const count=monthly.map(group=>group.reduce((s,r)=>s+r.orders,0));
+    const total=view.reduce((s,r)=>s+r.revenue,0), orderCount=count.reduce((s,n)=>s+n,0);
+    document.getElementById('revenue').textContent=fmt(total);
+    document.getElementById('orders').textContent=orderCount.toLocaleString('en-IN');
+    document.getElementById('aov').textContent=fmt(total/Math.max(1,orderCount));
+    document.getElementById('discount').textContent=(view.reduce((s,r)=>s+r.discount,0)/Math.max(1,view.length)).toFixed(1)+'%';
+    Plotly.react('trend',[
+      {type:'scatter',mode:'lines+markers',name:'Revenue',x:months,y:rev,line:{color:'#62e6bd',width:3},marker:{size:7},hovertemplate:'%{x}<br>Revenue: ₹%{y:,.0f}<extra></extra>'},
+      {type:'bar',name:'Orders',x:months,y:count,yaxis:'y2',marker:{color:'#7da8ff',opacity:.42},hovertemplate:'%{x}<br>Orders: %{y}<extra></extra>'}
+    ],{...baseLayout,barmode:'overlay',yaxis:{...baseLayout.yaxis,title:'Revenue (₹)'},yaxis2:{title:'Orders',overlaying:'y',side:'right',showgrid:false},xaxis:{...baseLayout.xaxis,rangeslider:{visible:true,thickness:.08}}},config);
+    const byRegion=regions.map(region=>view.filter(r=>r.region===region).reduce((s,r)=>s+r.revenue,0));
+    Plotly.react('regions',[{type:'bar',x:regions,y:byRegion,marker:{color:['#7da8ff','#62e6bd','#ffc979','#d49bff','#ff8297']},hovertemplate:'%{x}<br>Revenue: ₹%{y:,.0f}<extra></extra>'}],{...baseLayout,showlegend:false,yaxis:{...baseLayout.yaxis,title:'Revenue (₹)'},xaxis:{...baseLayout.xaxis,title:'Region'}},config);
+    Plotly.react('scatter',categories.map(category=>{const points=view.filter(r=>r.category===category);return {type:'scatter',mode:'markers',name:category,x:points.map(r=>r.discount),y:points.map(r=>r.revenue),text:points.map(r=>r.region),marker:{color:colors[category],size:9,opacity:.76},hovertemplate:'%{text}<br>Discount: %{x}%<br>Order value: ₹%{y:,.0f}<extra>'+category+'</extra>'}}),{...baseLayout,xaxis:{...baseLayout.xaxis,title:'Discount (%)'},yaxis:{...baseLayout.yaxis,title:'Sample order value (₹)'}},config);
+  }
+  document.getElementById('category').addEventListener('change',draw);
+  draw();
+</script>
+</body>
+</html>
